@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/livepeer/stream-tester/internal/metrics"
+	"github.com/livepeer/go-api-client/metrics"
 	"github.com/livepeer/stream-tester/internal/utils/uhttp"
 	"github.com/livepeer/stream-tester/model"
 )
@@ -54,6 +54,7 @@ type (
 		accessToken   string
 		presets       []string
 		httpClient    *http.Client
+		metrics       metrics.APIRecorder
 	}
 
 	geoResp struct {
@@ -169,30 +170,23 @@ type (
 	}
 )
 
-// NewLivepeer creates new Livepeer API object
-func NewLivepeer(livepeerToken, serverOverride string, presets []string) *API {
-	return &API{
-		choosenServer: addScheme(serverOverride),
-		accessToken:   livepeerToken,
-		presets:       presets,
-		httpClient:    defaultHTTPClient,
-	}
-}
-
-// NewLivepeer2 creates new Livepeer API object
-func NewLivepeer2(livepeerToken, serverOverride string, presets []string, timeout time.Duration) *API {
+// NewAPIClient creates new Livepeer API object
+func NewAPIClient(livepeerToken, serverOverride string, presets []string, timeout time.Duration, recorder metrics.APIRecorder) *API {
 	httpClient := defaultHTTPClient
 	if timeout != 0 {
 		httpClient = &http.Client{
 			Timeout: timeout,
 		}
-
+	}
+	if recorder == nil {
+		recorder = metrics.APIRequestRecorderFunc(func(name string, duration time.Duration, err error) {})
 	}
 	return &API{
 		choosenServer: addScheme(serverOverride),
 		accessToken:   livepeerToken,
 		presets:       presets,
 		httpClient:    httpClient,
+		metrics:       recorder,
 	}
 }
 
@@ -635,7 +629,7 @@ func (lapi *API) SetActive(id string, active bool, startedAt time.Time) (bool, e
 	b, _ := json.Marshal(&ar)
 	req, err := uhttp.NewRequest("PUT", u, bytes.NewBuffer(b))
 	if err != nil {
-		metrics.APIRequest("set_active", 0, err)
+		lapi.metrics.APIRequest("set_active", 0, err)
 		return true, err
 	}
 	ctx, cancel := context.WithTimeout(req.Context(), setActiveTimeout)
@@ -647,18 +641,18 @@ func (lapi *API) SetActive(id string, active bool, startedAt time.Time) (bool, e
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
 		glog.Errorf("id=%s/setactive Error set active %v", id, err)
-		metrics.APIRequest("set_active", 0, err)
+		lapi.metrics.APIRequest("set_active", 0, err)
 		return true, err
 	}
 	defer resp.Body.Close()
 	b, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
 		glog.Errorf("id=%s/setactive Error set active (body) %v", err)
-		metrics.APIRequest("set_active", 0, err)
+		lapi.metrics.APIRequest("set_active", 0, err)
 		return true, err
 	}
 	took := time.Since(start)
-	metrics.APIRequest("set_active", took, nil)
+	lapi.metrics.APIRequest("set_active", took, nil)
 	glog.Infof("%s/setactive took=%s response status code %d status %s resp %+v body=%s",
 		id, took, resp.StatusCode, resp.Status, resp, string(b))
 	return resp.StatusCode >= 200 && resp.StatusCode < 300, nil
@@ -677,7 +671,7 @@ func (lapi *API) DeactivateMany(ids []string) (int, error) {
 	b, _ := json.Marshal(&dmreq)
 	req, err := uhttp.NewRequest("PATCH", u, bytes.NewBuffer(b))
 	if err != nil {
-		metrics.APIRequest("deactivate-many", 0, err)
+		lapi.metrics.APIRequest("deactivate-many", 0, err)
 		return 0, err
 	}
 	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
@@ -685,18 +679,18 @@ func (lapi *API) DeactivateMany(ids []string) (int, error) {
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
 		glog.Errorf("/deactivate-many err=%v", err)
-		metrics.APIRequest("set_active", 0, err)
+		lapi.metrics.APIRequest("set_active", 0, err)
 		return 0, err
 	}
 	defer resp.Body.Close()
 	b, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
 		glog.Errorf("deactivate-many body err=%v", err)
-		metrics.APIRequest("deactivate-many", 0, err)
+		lapi.metrics.APIRequest("deactivate-many", 0, err)
 		return 0, err
 	}
 	took := time.Since(start)
-	metrics.APIRequest("deactivate-many", took, nil)
+	lapi.metrics.APIRequest("deactivate-many", took, nil)
 	glog.Infof("deactivate-many took=%s response status code %d status %s resp %+v body=%s",
 		took, resp.StatusCode, resp.Status, resp, string(b))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -719,7 +713,7 @@ func (lapi *API) getStream(u, rType string) (*CreateStreamResp, error) {
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
 		glog.Errorf("Error getting stream by id from Livepeer API server (%s) error: %v", u, err)
-		metrics.APIRequest(rType, 0, err)
+		lapi.metrics.APIRequest(rType, 0, err)
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -727,21 +721,21 @@ func (lapi *API) getStream(u, rType string) (*CreateStreamResp, error) {
 		b, _ := ioutil.ReadAll(resp.Body)
 		glog.Errorf("Status error getting stream by id Livepeer API server (%s) status %d body: %s", u, resp.StatusCode, string(b))
 		if resp.StatusCode == http.StatusNotFound {
-			metrics.APIRequest(rType, 0, ErrNotExists)
+			lapi.metrics.APIRequest(rType, 0, ErrNotExists)
 			return nil, ErrNotExists
 		}
 		err := errors.New(http.StatusText(resp.StatusCode))
-		metrics.APIRequest(rType, 0, err)
+		lapi.metrics.APIRequest(rType, 0, err)
 		return nil, err
 	}
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		glog.Errorf("Error getting stream by id Livepeer API server (%s) error: %v", u, err)
-		metrics.APIRequest(rType, 0, err)
+		lapi.metrics.APIRequest(rType, 0, err)
 		return nil, err
 	}
 	took := time.Since(start)
-	metrics.APIRequest(rType, took, nil)
+	lapi.metrics.APIRequest(rType, took, nil)
 	bs := string(b)
 	glog.V(model.VERBOSE).Info(bs)
 	if bs == "null" {
@@ -765,7 +759,7 @@ func (lapi *API) GetMultistreamTarget(id string) (*MultistreamTarget, error) {
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
 		glog.Errorf("Error getting MultistreamTarget by id from Livepeer API server (%s) error: %v", u, err)
-		metrics.APIRequest(rType, 0, err)
+		lapi.metrics.APIRequest(rType, 0, err)
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -773,21 +767,21 @@ func (lapi *API) GetMultistreamTarget(id string) (*MultistreamTarget, error) {
 		b, _ := ioutil.ReadAll(resp.Body)
 		glog.Errorf("Status error getting MultistreamTarget by id Livepeer API server (%s) status %d body: %s", u, resp.StatusCode, string(b))
 		if resp.StatusCode == http.StatusNotFound {
-			metrics.APIRequest(rType, 0, ErrNotExists)
+			lapi.metrics.APIRequest(rType, 0, ErrNotExists)
 			return nil, ErrNotExists
 		}
 		err := errors.New(http.StatusText(resp.StatusCode))
-		metrics.APIRequest(rType, 0, err)
+		lapi.metrics.APIRequest(rType, 0, err)
 		return nil, err
 	}
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		glog.Errorf("Error getting MultistreamTarget by id Livepeer API server (%s) error: %v", u, err)
-		metrics.APIRequest(rType, 0, err)
+		lapi.metrics.APIRequest(rType, 0, err)
 		return nil, err
 	}
 	took := time.Since(start)
-	metrics.APIRequest(rType, took, nil)
+	lapi.metrics.APIRequest(rType, took, nil)
 	bs := string(b)
 	glog.V(model.VERBOSE).Info(bs)
 	if bs == "null" {
