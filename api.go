@@ -255,6 +255,11 @@ func MustGeolocateAPIServer() string {
 	return server
 }
 
+// GetServer returns chosen server
+func (lapi *Client) GetServer() string {
+	return lapi.chosenServer
+}
+
 // Broadcasters returns list of hostnames of broadcasters to use
 func (lapi *Client) Broadcasters() ([]string, error) {
 	u := fmt.Sprintf("%s/api/broadcaster", lapi.chosenServer)
