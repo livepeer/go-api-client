@@ -209,39 +209,37 @@ func addScheme(uri string) string {
 	return "https://" + uri
 }
 
-// GetServer returns choosen server
-func (lapi *API) GetServer() string {
-	return lapi.chosenServer
-}
-
-// Init calls geolocation API endpoint to find closes server
-// do nothing if `serverOverride` was not empty in the `NewLivepeer` call
-func (lapi *API) Init() {
-	if lapi.chosenServer != "" {
-		return
-	}
-
-	resp, err := lapi.httpClient.Do(lapi.getRequest(livepeerAPIGeolocateURL))
+// GeolocateAPIServer calls geolocation API endpoint to find the closest server.
+func GeolocateAPIServer() (string, error) {
+	resp, err := http.Get(livepeerAPIGeolocateURL)
 	if err != nil {
-		glog.Fatalf("Error geolocating Livepeer API server (%s) error: %v", livepeerAPIGeolocateURL, err)
+		return "", fmt.Errorf("Error geolocating Livepeer API server (%s): %w", livepeerAPIGeolocateURL, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		b, _ := ioutil.ReadAll(resp.Body)
-		glog.Fatalf("Status error contacting Livepeer API server (%s) status %d body: %s", livepeerAPIGeolocateURL, resp.StatusCode, string(b))
+		return "", fmt.Errorf("Status error contacting Livepeer API server (%s) status %d body: %s", livepeerAPIGeolocateURL, resp.StatusCode, string(b))
 	}
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		glog.Fatalf("Error geolocating Livepeer API server (%s) error: %v", livepeerAPIGeolocateURL, err)
+		return "", fmt.Errorf("Error geolocating Livepeer API server (%s): %w", livepeerAPIGeolocateURL, err)
 	}
 	glog.Info(string(b))
 	geo := &geoResp{}
 	err = json.Unmarshal(b, geo)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 	glog.Infof("chosen server: %s, servers num: %d", geo.ChosenServer, len(geo.Servers))
-	lapi.chosenServer = addScheme(geo.ChosenServer)
+	return addScheme(geo.ChosenServer), nil
+}
+
+func MustGeolocateAPIServer() string {
+	server, err := GeolocateAPIServer()
+	if err != nil {
+		glog.Fatalf("Failed to geolocate API server: %v", err)
+	}
+	return server
 }
 
 // Broadcasters returns list of hostnames of broadcasters to use
