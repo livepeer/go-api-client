@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/livepeer/go-api-client/logs"
 	"github.com/livepeer/go-api-client/metrics"
-	"github.com/livepeer/stream-tester/model"
 )
 
 // ErrNotExists returned if stream is not found
@@ -345,7 +345,7 @@ func (lapi *API) CreateStream(name string, presets ...string) (string, error) {
 
 // DeleteStream deletes stream
 func (lapi *API) DeleteStream(id string) error {
-	glog.V(model.DEBUG).Infof("Deleting Livepeer stream '%s' ", id)
+	glog.V(logs.DEBUG).Infof("Deleting Livepeer stream '%s' ", id)
 	u := fmt.Sprintf("%s/api/stream/%s", lapi.choosenServer, id)
 	req, err := lapi.newRequest("DELETE", u, nil)
 	if err != nil {
@@ -394,7 +394,7 @@ func (lapi *API) CreateStreamEx2(name string, record bool, parentID string, pres
 	}
 	b, err := json.Marshal(reqs)
 	if err != nil {
-		glog.V(model.SHORT).Infof("Error marshalling create stream request %v", err)
+		glog.V(logs.SHORT).Infof("Error marshalling create stream request %v", err)
 		return nil, err
 	}
 	glog.Infof("Sending: %s", b)
@@ -526,10 +526,10 @@ func (lapi *API) GetSessionsNew(id string, forceUrl bool) ([]UserSession, error)
 		return nil, err
 	}
 	took := time.Since(start)
-	glog.V(model.DEBUG).Infof("sessions request for id=%s took=%s", id, took)
+	glog.V(logs.DEBUG).Infof("sessions request for id=%s took=%s", id, took)
 	bs := string(b)
 	glog.Info(bs)
-	glog.V(model.VERBOSE).Info(bs)
+	glog.V(logs.VERBOSE).Info(bs)
 	if bs == "null" || bs == "" {
 		// API return null if stream does not exists
 		return nil, ErrNotExists
@@ -575,9 +575,9 @@ func (lapi *API) GetSessions(id string, forceUrl bool) ([]UserSession, error) {
 		return nil, err
 	}
 	took := time.Since(start)
-	glog.V(model.DEBUG).Infof("sessions request for id=%s took=%s", id, took)
+	glog.V(logs.DEBUG).Infof("sessions request for id=%s took=%s", id, took)
 	bs := string(b)
-	glog.V(model.VERBOSE).Info(bs)
+	glog.V(logs.VERBOSE).Info(bs)
 	if bs == "null" || bs == "" {
 		// API return null if stream does not exists
 		return nil, ErrNotExists
@@ -731,7 +731,7 @@ func (lapi *API) getStream(u, rType string) (*CreateStreamResp, error) {
 	took := time.Since(start)
 	lapi.metrics.APIRequest(rType, took, nil)
 	bs := string(b)
-	glog.V(model.VERBOSE).Info(bs)
+	glog.V(logs.VERBOSE).Info(bs)
 	if bs == "null" {
 		// API return null if stream does not exists
 		return nil, ErrNotExists
@@ -777,7 +777,7 @@ func (lapi *API) GetMultistreamTarget(id string) (*MultistreamTarget, error) {
 	took := time.Since(start)
 	lapi.metrics.APIRequest(rType, took, nil)
 	bs := string(b)
-	glog.V(model.VERBOSE).Info(bs)
+	glog.V(logs.VERBOSE).Info(bs)
 	if bs == "null" {
 		// API return null if stream does not exists
 		return nil, ErrNotExists
