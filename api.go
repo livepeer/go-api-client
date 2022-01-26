@@ -1,5 +1,5 @@
 // Package livepeer API
-package livepeer
+package livepeerAPI
 
 import (
 	"bytes"
@@ -41,7 +41,7 @@ const (
 
 type (
 	// Object with all options given to Livepeer API
-	APIOptions struct {
+	ClientOptions struct {
 		Server      string
 		AccessToken string
 		UserAgent   string
@@ -51,7 +51,7 @@ type (
 	}
 
 	// API object incapsulating Livepeer's hosted API
-	API struct {
+	Client struct {
 		accessToken string
 		userAgent   string
 		presets     []string
@@ -177,7 +177,7 @@ type (
 // NewAPIClientGeolocated creates a new Livepeer API object calling the
 // geolocation endpoint if no server is provided (by default, server is
 // production instead)
-func NewAPIClientGeolocated(opts APIOptions) (*API, string) {
+func NewAPIClientGeolocated(opts ClientOptions) (*Client, string) {
 	if opts.Server == "" {
 		opts.Server = MustGeolocateAPIServer()
 	}
@@ -185,7 +185,7 @@ func NewAPIClientGeolocated(opts APIOptions) (*API, string) {
 }
 
 // NewAPIClient creates new Livepeer API object with a full configuration.
-func NewAPIClient(opts APIOptions) *API {
+func NewAPIClient(opts ClientOptions) *Client {
 	if opts.Server == "" {
 		opts.Server = ProdServer
 	}
@@ -198,7 +198,7 @@ func NewAPIClient(opts APIOptions) *API {
 	if opts.Metrics == nil {
 		opts.Metrics = metrics.APIRequestRecorderFunc(func(name string, duration time.Duration, err error) {})
 	}
-	return &API{
+	return &Client{
 		chosenServer: addScheme(opts.Server),
 		accessToken:  opts.AccessToken,
 		userAgent:    opts.UserAgent,
@@ -256,7 +256,7 @@ func MustGeolocateAPIServer() string {
 }
 
 // Broadcasters returns list of hostnames of broadcasters to use
-func (lapi *API) Broadcasters() ([]string, error) {
+func (lapi *Client) Broadcasters() ([]string, error) {
 	u := fmt.Sprintf("%s/api/broadcaster", lapi.chosenServer)
 	resp, err := lapi.httpClient.Do(lapi.getRequest(u))
 	if err != nil {
@@ -293,7 +293,7 @@ type Ingest struct {
 }
 
 // Ingest returns ingest object
-func (lapi *API) Ingest(all bool) ([]Ingest, error) {
+func (lapi *Client) Ingest(all bool) ([]Ingest, error) {
 	u := fmt.Sprintf("%s/api/ingest", lapi.chosenServer)
 	if all {
 		u += "?first=false"
@@ -357,7 +357,7 @@ var StandardProfiles = []Profile{
 }
 
 // CreateStream creates stream with specified name and profiles
-func (lapi *API) CreateStream(name string, presets ...string) (string, error) {
+func (lapi *Client) CreateStream(name string, presets ...string) (string, error) {
 	csr, err := lapi.CreateStreamEx(name, false, presets)
 	if err != nil {
 		return "", err
@@ -366,7 +366,7 @@ func (lapi *API) CreateStream(name string, presets ...string) (string, error) {
 }
 
 // DeleteStream deletes stream
-func (lapi *API) DeleteStream(id string) error {
+func (lapi *Client) DeleteStream(id string) error {
 	glog.V(logs.DEBUG).Infof("Deleting Livepeer stream '%s' ", id)
 	u := fmt.Sprintf("%s/api/stream/%s", lapi.chosenServer, id)
 	req, err := lapi.newRequest("DELETE", u, nil)
@@ -392,12 +392,12 @@ func (lapi *API) DeleteStream(id string) error {
 }
 
 // CreateStreamEx creates stream with specified name and profiles
-func (lapi *API) CreateStreamEx(name string, record bool, presets []string, profiles ...Profile) (*CreateStreamResp, error) {
+func (lapi *Client) CreateStreamEx(name string, record bool, presets []string, profiles ...Profile) (*CreateStreamResp, error) {
 	return lapi.CreateStreamEx2(name, record, "", presets, profiles...)
 }
 
 // CreateStreamEx creates stream with specified name and profiles
-func (lapi *API) CreateStreamEx2(name string, record bool, parentID string, presets []string, profiles ...Profile) (*CreateStreamResp, error) {
+func (lapi *Client) CreateStreamEx2(name string, record bool, parentID string, presets []string, profiles ...Profile) (*CreateStreamResp, error) {
 	// presets := profiles
 	// if len(presets) == 0 {
 	// 	presets = lapi.presets
@@ -455,12 +455,12 @@ func (lapi *API) CreateStreamEx2(name string, record bool, parentID string, pres
 }
 
 // DefaultPresets returns default presets
-func (lapi *API) DefaultPresets() []string {
+func (lapi *Client) DefaultPresets() []string {
 	return lapi.presets
 }
 
 // GetStreamByKey gets stream by streamKey
-func (lapi *API) GetStreamByKey(key string) (*CreateStreamResp, error) {
+func (lapi *Client) GetStreamByKey(key string) (*CreateStreamResp, error) {
 	if key == "" {
 		return nil, errors.New("empty key")
 	}
@@ -469,7 +469,7 @@ func (lapi *API) GetStreamByKey(key string) (*CreateStreamResp, error) {
 }
 
 // GetStreamByPlaybackID gets stream by playbackID
-func (lapi *API) GetStreamByPlaybackID(playbackID string) (*CreateStreamResp, error) {
+func (lapi *Client) GetStreamByPlaybackID(playbackID string) (*CreateStreamResp, error) {
 	if playbackID == "" {
 		return nil, errors.New("empty playbackID")
 	}
@@ -478,7 +478,7 @@ func (lapi *API) GetStreamByPlaybackID(playbackID string) (*CreateStreamResp, er
 }
 
 // GetStream gets stream by id
-func (lapi *API) GetStream(id string) (*CreateStreamResp, error) {
+func (lapi *Client) GetStream(id string) (*CreateStreamResp, error) {
 	if id == "" {
 		return nil, errors.New("empty id")
 	}
@@ -487,7 +487,7 @@ func (lapi *API) GetStream(id string) (*CreateStreamResp, error) {
 }
 
 // GetSessionsR gets user's sessions for the stream by id
-func (lapi *API) GetSessionsR(id string, forceUrl bool) ([]UserSession, error) {
+func (lapi *Client) GetSessionsR(id string, forceUrl bool) ([]UserSession, error) {
 	var apiTry int
 	for {
 		sessions, err := lapi.GetSessions(id, forceUrl)
@@ -502,7 +502,7 @@ func (lapi *API) GetSessionsR(id string, forceUrl bool) ([]UserSession, error) {
 }
 
 // GetSessionsNewR gets user's sessions for the stream by id
-func (lapi *API) GetSessionsNewR(id string, forceUrl bool) ([]UserSession, error) {
+func (lapi *Client) GetSessionsNewR(id string, forceUrl bool) ([]UserSession, error) {
 	var apiTry int
 	for {
 		sessions, err := lapi.GetSessionsNew(id, forceUrl)
@@ -516,7 +516,7 @@ func (lapi *API) GetSessionsNewR(id string, forceUrl bool) ([]UserSession, error
 	}
 }
 
-func (lapi *API) GetSessionsNew(id string, forceUrl bool) ([]UserSession, error) {
+func (lapi *Client) GetSessionsNew(id string, forceUrl bool) ([]UserSession, error) {
 	if id == "" {
 		return nil, errors.New("empty id")
 	}
@@ -565,7 +565,7 @@ func (lapi *API) GetSessionsNew(id string, forceUrl bool) ([]UserSession, error)
 }
 
 // GetSessions gets user's sessions for the stream by id
-func (lapi *API) GetSessions(id string, forceUrl bool) ([]UserSession, error) {
+func (lapi *Client) GetSessions(id string, forceUrl bool) ([]UserSession, error) {
 	if id == "" {
 		return nil, errors.New("empty id")
 	}
@@ -613,7 +613,7 @@ func (lapi *API) GetSessions(id string, forceUrl bool) ([]UserSession, error) {
 }
 
 // SetActiveR sets stream active with retries
-func (lapi *API) SetActiveR(id string, active bool, startedAt time.Time) (bool, error) {
+func (lapi *Client) SetActiveR(id string, active bool, startedAt time.Time) (bool, error) {
 	apiTry := 1
 	for {
 		ok, err := lapi.SetActive(id, active, startedAt)
@@ -629,7 +629,7 @@ func (lapi *API) SetActiveR(id string, active bool, startedAt time.Time) (bool, 
 }
 
 // SetActive set isActive
-func (lapi *API) SetActive(id string, active bool, startedAt time.Time) (bool, error) {
+func (lapi *Client) SetActive(id string, active bool, startedAt time.Time) (bool, error) {
 	if id == "" {
 		return true, errors.New("empty id")
 	}
@@ -675,7 +675,7 @@ func (lapi *API) SetActive(id string, active bool, startedAt time.Time) (bool, e
 }
 
 // DeactivateMany sets many streams isActive field to false
-func (lapi *API) DeactivateMany(ids []string) (int, error) {
+func (lapi *Client) DeactivateMany(ids []string) (int, error) {
 	if len(ids) == 0 {
 		return 0, errors.New("empty ids")
 	}
@@ -722,7 +722,7 @@ func (lapi *API) DeactivateMany(ids []string) (int, error) {
 	return mr.RowCount, nil
 }
 
-func (lapi *API) getStream(u, rType string) (*CreateStreamResp, error) {
+func (lapi *Client) getStream(u, rType string) (*CreateStreamResp, error) {
 	start := time.Now()
 	req := lapi.getRequest(u)
 	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
@@ -766,7 +766,7 @@ func (lapi *API) getStream(u, rType string) (*CreateStreamResp, error) {
 	return r, nil
 }
 
-func (lapi *API) GetMultistreamTarget(id string) (*MultistreamTarget, error) {
+func (lapi *Client) GetMultistreamTarget(id string) (*MultistreamTarget, error) {
 	rType := "get_multistream_target"
 	start := time.Now()
 	u := fmt.Sprintf("%s/api/multistream/target/%s", lapi.chosenServer, id)
@@ -813,7 +813,7 @@ func (lapi *API) GetMultistreamTarget(id string) (*MultistreamTarget, error) {
 }
 
 // GetMultistreamTargetR gets multistream target with retries
-func (lapi *API) GetMultistreamTargetR(id string) (*MultistreamTarget, error) {
+func (lapi *Client) GetMultistreamTargetR(id string) (*MultistreamTarget, error) {
 	var apiTry int
 	for {
 		target, err := lapi.GetMultistreamTarget(id)
@@ -834,7 +834,7 @@ func Timedout(e error) bool {
 	return ok && t.Timeout() || (e != nil && strings.Contains(e.Error(), "Client.Timeout"))
 }
 
-func (lapi *API) newRequest(method, url string, body io.Reader) (*http.Request, error) {
+func (lapi *Client) newRequest(method, url string, body io.Reader) (*http.Request, error) {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, err
@@ -845,7 +845,7 @@ func (lapi *API) newRequest(method, url string, body io.Reader) (*http.Request, 
 	return req, err
 }
 
-func (lapi *API) getRequest(url string) *http.Request {
+func (lapi *Client) getRequest(url string) *http.Request {
 	req, err := lapi.newRequest("GET", url, nil)
 	if err != nil {
 		glog.Fatal(err)
