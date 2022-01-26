@@ -20,7 +20,7 @@ import (
 )
 
 // ErrNotExists returned if stream is not found
-var ErrNotExists = errors.New("Stream does not exist")
+var ErrNotExists = errors.New("stream does not exist")
 
 const httpTimeout = 4 * time.Second
 const setActiveTimeout = 1500 * time.Millisecond
@@ -226,16 +226,16 @@ func addScheme(uri string) string {
 func GeolocateAPIServer() (string, error) {
 	resp, err := http.Get(livepeerAPIGeolocateURL)
 	if err != nil {
-		return "", fmt.Errorf("Error geolocating Livepeer API server (%s): %w", livepeerAPIGeolocateURL, err)
+		return "", fmt.Errorf("error geolocating Livepeer API server (%s): %w", livepeerAPIGeolocateURL, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		b, _ := ioutil.ReadAll(resp.Body)
-		return "", fmt.Errorf("Status error contacting Livepeer API server (%s) status %d body: %s", livepeerAPIGeolocateURL, resp.StatusCode, string(b))
+		return "", fmt.Errorf("status error contacting Livepeer API server (%s) status %d body: %s", livepeerAPIGeolocateURL, resp.StatusCode, string(b))
 	}
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("Error geolocating Livepeer API server (%s): %w", livepeerAPIGeolocateURL, err)
+		return "", fmt.Errorf("error geolocating Livepeer API server (%s): %w", livepeerAPIGeolocateURL, err)
 	}
 	glog.Info(string(b))
 	geo := &geoResp{}
@@ -391,7 +391,7 @@ func (lapi *Client) DeleteStream(id string) error {
 		return err
 	}
 	if resp.StatusCode != 204 {
-		return fmt.Errorf("Error deleting stream %s: status is %s", id, resp.Status)
+		return fmt.Errorf("error deleting stream %s: status is %s", id, resp.Status)
 	}
 	return nil
 }
@@ -453,7 +453,7 @@ func (lapi *Client) CreateStreamEx2(name string, record bool, parentID string, p
 		return nil, err
 	}
 	if len(r.Errors) > 0 {
-		return nil, fmt.Errorf("Error creating stream: %+v", r.Errors)
+		return nil, fmt.Errorf("error creating stream: %+v", r.Errors)
 	}
 	glog.Infof("Stream %s created with id %s", name, r.ID)
 	return r, nil
