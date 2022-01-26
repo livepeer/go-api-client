@@ -174,8 +174,21 @@ type (
 	}
 )
 
+// NewAPIClientGeolocated creates a new Livepeer API object calling the
+// geolocation endpoint if no server is provided (by default, server is
+// production instead)
+func NewAPIClientGeolocated(opts APIOptions) (*API, string) {
+	if opts.Server == "" {
+		opts.Server = MustGeolocateAPIServer()
+	}
+	return NewAPIClient(opts), opts.Server
+}
+
 // NewAPIClient creates new Livepeer API object with a full configuration.
 func NewAPIClient(opts APIOptions) *API {
+	if opts.Server == "" {
+		opts.Server = ProdServer
+	}
 	httpClient := defaultHTTPClient
 	if opts.Timeout != 0 {
 		httpClient = &http.Client{
