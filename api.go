@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -15,32 +16,23 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/livepeer/go-api-client/metrics"
-	"github.com/livepeer/stream-tester/internal/utils/uhttp"
 	"github.com/livepeer/stream-tester/model"
 )
 
 // ErrNotExists returned if stream is not found
-var ErrNotExists = errors.New("Stream does not exists")
+var ErrNotExists = errors.New("Stream does not exist")
 
 const httpTimeout = 4 * time.Second
 const setActiveTimeout = 1500 * time.Millisecond
 
 var defaultHTTPClient = &http.Client{
-	// Transport: &http2.Transport{TLSClientConfig: tlsConfig},
-	// Transport: &http2.Transport{AllowHTTP: true},
 	Timeout: httpTimeout,
 }
 
 var hostName, _ = os.Hostname()
 
 const (
-	// ESHServer GCP? server
-	ESHServer = "esh.livepeer.live"
-	// ACServer Atlantic Crypto server
-	// ACServer = "chi.livepeer-ac.live"
-	ACServer = "livepeer.monster"
-
-	livepeerAPIGeolocateURL = "http://livepeer.live/api/geolocate"
+	livepeerAPIGeolocateURL = "http://livepeer.com/api/geolocate"
 	ProdServer              = "livepeer.com"
 
 	RecordingStatusWaiting = "waiting"
@@ -52,6 +44,7 @@ type (
 	API struct {
 		choosenServer string
 		accessToken   string
+		userAgent     string
 		presets       []string
 		httpClient    *http.Client
 		metrics       metrics.APIRecorder
@@ -171,7 +164,7 @@ type (
 )
 
 // NewAPIClient creates new Livepeer API object
-func NewAPIClient(livepeerToken, serverOverride string, presets []string, timeout time.Duration, recorder metrics.APIRecorder) *API {
+func NewAPIClient(livepeerToken, serverOverride, userAgent string, presets []string, timeout time.Duration, recorder metrics.APIRecorder) *API {
 	httpClient := defaultHTTPClient
 	if timeout != 0 {
 		httpClient = &http.Client{
@@ -184,6 +177,7 @@ func NewAPIClient(livepeerToken, serverOverride string, presets []string, timeou
 	return &API{
 		choosenServer: addScheme(serverOverride),
 		accessToken:   livepeerToken,
+		userAgent:     userAgent,
 		presets:       presets,
 		httpClient:    httpClient,
 		metrics:       recorder,
@@ -216,7 +210,7 @@ func (lapi *API) Init() {
 		return
 	}
 
-	resp, err := lapi.httpClient.Do(uhttp.GetRequest(livepeerAPIGeolocateURL))
+	resp, err := lapi.httpClient.Do(lapi.getRequest(livepeerAPIGeolocateURL))
 	if err != nil {
 		glog.Fatalf("Error geolocating Livepeer API server (%s) error: %v", livepeerAPIGeolocateURL, err)
 	}
@@ -242,7 +236,7 @@ func (lapi *API) Init() {
 // Broadcasters returns list of hostnames of broadcasters to use
 func (lapi *API) Broadcasters() ([]string, error) {
 	u := fmt.Sprintf("%s/api/broadcaster", lapi.choosenServer)
-	resp, err := lapi.httpClient.Do(uhttp.GetRequest(u))
+	resp, err := lapi.httpClient.Do(lapi.getRequest(u))
 	if err != nil {
 		glog.Errorf("Error getting broadcasters from Livepeer API server (%s) error: %v", u, err)
 		return nil, err
@@ -282,7 +276,7 @@ func (lapi *API) Ingest(all bool) ([]Ingest, error) {
 	if all {
 		u += "?first=false"
 	}
-	resp, err := lapi.httpClient.Do(uhttp.GetRequest(u))
+	resp, err := lapi.httpClient.Do(lapi.getRequest(u))
 	if err != nil {
 		glog.Errorf("Error getting ingests from Livepeer API server (%s) error: %v", u, err)
 		return nil, err
@@ -353,7 +347,7 @@ func (lapi *API) CreateStream(name string, presets ...string) (string, error) {
 func (lapi *API) DeleteStream(id string) error {
 	glog.V(model.DEBUG).Infof("Deleting Livepeer stream '%s' ", id)
 	u := fmt.Sprintf("%s/api/stream/%s", lapi.choosenServer, id)
-	req, err := uhttp.NewRequest("DELETE", u, nil)
+	req, err := lapi.newRequest("DELETE", u, nil)
 	if err != nil {
 		return err
 	}
@@ -408,7 +402,7 @@ func (lapi *API) CreateStreamEx2(name string, record bool, parentID string, pres
 	if parentID != "" {
 		u = fmt.Sprintf("%s/api/stream/%s/stream", lapi.choosenServer, parentID)
 	}
-	req, err := uhttp.NewRequest("POST", u, bytes.NewBuffer(b))
+	req, err := lapi.newRequest("POST", u, bytes.NewBuffer(b))
 	if err != nil {
 		return nil, err
 	}
@@ -509,7 +503,7 @@ func (lapi *API) GetSessionsNew(id string, forceUrl bool) ([]UserSession, error)
 		u += "&forceUrl=1"
 	}
 	start := time.Now()
-	req := uhttp.GetRequest(u)
+	req := lapi.getRequest(u)
 	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
@@ -558,7 +552,7 @@ func (lapi *API) GetSessions(id string, forceUrl bool) ([]UserSession, error) {
 		u += "?forceUrl=1"
 	}
 	start := time.Now()
-	req := uhttp.GetRequest(u)
+	req := lapi.getRequest(u)
 	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
@@ -627,7 +621,7 @@ func (lapi *API) SetActive(id string, active bool, startedAt time.Time) (bool, e
 		ar.StartedAt = startedAt.UnixNano() / int64(time.Millisecond)
 	}
 	b, _ := json.Marshal(&ar)
-	req, err := uhttp.NewRequest("PUT", u, bytes.NewBuffer(b))
+	req, err := lapi.newRequest("PUT", u, bytes.NewBuffer(b))
 	if err != nil {
 		lapi.metrics.APIRequest("set_active", 0, err)
 		return true, err
@@ -669,7 +663,7 @@ func (lapi *API) DeactivateMany(ids []string) (int, error) {
 		IDS: ids,
 	}
 	b, _ := json.Marshal(&dmreq)
-	req, err := uhttp.NewRequest("PATCH", u, bytes.NewBuffer(b))
+	req, err := lapi.newRequest("PATCH", u, bytes.NewBuffer(b))
 	if err != nil {
 		lapi.metrics.APIRequest("deactivate-many", 0, err)
 		return 0, err
@@ -708,7 +702,7 @@ func (lapi *API) DeactivateMany(ids []string) (int, error) {
 
 func (lapi *API) getStream(u, rType string) (*CreateStreamResp, error) {
 	start := time.Now()
-	req := uhttp.GetRequest(u)
+	req := lapi.getRequest(u)
 	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
@@ -754,7 +748,7 @@ func (lapi *API) GetMultistreamTarget(id string) (*MultistreamTarget, error) {
 	rType := "get_multistream_target"
 	start := time.Now()
 	u := fmt.Sprintf("%s/api/multistream/target/%s", lapi.choosenServer, id)
-	req := uhttp.GetRequest(u)
+	req := lapi.getRequest(u)
 	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
@@ -816,4 +810,23 @@ func Timedout(e error) bool {
 		Timeout() bool
 	})
 	return ok && t.Timeout() || (e != nil && strings.Contains(e.Error(), "Client.Timeout"))
+}
+
+func (lapi *API) newRequest(method, url string, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return nil, err
+	}
+	if lapi.userAgent != "" {
+		req.Header.Add("User-Agent", lapi.userAgent)
+	}
+	return req, err
+}
+
+func (lapi *API) getRequest(url string) *http.Request {
+	req, err := lapi.newRequest("GET", url, nil)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	return req
 }
