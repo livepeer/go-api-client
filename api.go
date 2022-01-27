@@ -146,6 +146,12 @@ type (
 		CreatedAt int64  `json:"createdAt,omitempty"`
 	}
 
+	Task struct {
+		ID        string `json:"id,omitempty"`
+		UserId    string `json:"userId,omitempty"`
+		CreatedAt int64  `json:"createdAt,omitempty"`
+	}
+
 	// // Profile ...
 	// Profile struct {
 	// 	Fps     int    `json:"fps"`
@@ -769,6 +775,49 @@ func (lapi *Client) getStream(u, rType string) (*CreateStreamResp, error) {
 		return nil, err
 	}
 	return r, nil
+}
+
+func (lapi *Client) GetTask(id string) (*Task, error) {
+	rType := "get_task"
+	start := time.Now()
+	u := fmt.Sprintf("%s/api/task/%s", lapi.chosenServer, id)
+	req := lapi.getRequest(u)
+	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
+
+	resp, err := lapi.httpClient.Do(req)
+	if err != nil {
+		glog.Errorf("Error getting Task by id from Livepeer API server (%s) error: %v", u, err)
+		lapi.metrics.APIRequest(rType, 0, err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := ioutil.ReadAll(resp.Body)
+		glog.Errorf("Status error getting Task by id from Livepeer API server (%s) status %d body: %s", u, resp.StatusCode, string(b))
+		if resp.StatusCode == http.StatusNotFound {
+			lapi.metrics.APIRequest(rType, 0, ErrNotExists)
+			return nil, ErrNotExists
+		}
+		err := errors.New(http.StatusText(resp.StatusCode))
+		lapi.metrics.APIRequest(rType, 0, err)
+		return nil, err
+	}
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		glog.Errorf("Error getting Task by id Livepeer API server (%s) error: %v", u, err)
+		lapi.metrics.APIRequest(rType, 0, err)
+		return nil, err
+	}
+	took := time.Since(start)
+	lapi.metrics.APIRequest(rType, took, nil)
+
+	var task Task
+	if err := json.Unmarshal(b, &task); err != nil {
+		return nil, err
+	}
+	return &task, nil
 }
 
 func (lapi *Client) GetMultistreamTarget(id string) (*MultistreamTarget, error) {
