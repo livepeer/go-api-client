@@ -733,103 +733,33 @@ func (lapi *Client) DeactivateMany(ids []string) (int, error) {
 	return mr.RowCount, nil
 }
 
-func (lapi *Client) getStream(u, rType string) (*CreateStreamResp, error) {
-	start := time.Now()
-	req := lapi.getRequest(u)
-	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
-	resp, err := lapi.httpClient.Do(req)
-	if err != nil {
-		glog.Errorf("Error getting stream by id from Livepeer API server (%s) error: %v", u, err)
-		lapi.metrics.APIRequest(rType, 0, err)
+func (lapi *Client) getStream(url, metricName string) (*CreateStreamResp, error) {
+	var stream *CreateStreamResp
+	if err := lapi.getJSON(url, "stream", metricName, &stream); err != nil {
 		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		b, _ := ioutil.ReadAll(resp.Body)
-		glog.Errorf("Status error getting stream by id Livepeer API server (%s) status %d body: %s", u, resp.StatusCode, string(b))
-		if resp.StatusCode == http.StatusNotFound {
-			lapi.metrics.APIRequest(rType, 0, ErrNotExists)
-			return nil, ErrNotExists
-		}
-		err := errors.New(http.StatusText(resp.StatusCode))
-		lapi.metrics.APIRequest(rType, 0, err)
-		return nil, err
-	}
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		glog.Errorf("Error getting stream by id Livepeer API server (%s) error: %v", u, err)
-		lapi.metrics.APIRequest(rType, 0, err)
-		return nil, err
-	}
-	took := time.Since(start)
-	lapi.metrics.APIRequest(rType, took, nil)
-	bs := string(b)
-	glog.V(logs.VERBOSE).Info(bs)
-	if bs == "null" {
+	} else if stream == nil {
 		// API return null if stream does not exists
 		return nil, ErrNotExists
 	}
-	r := &CreateStreamResp{}
-	err = json.Unmarshal(b, r)
-	if err != nil {
-		return nil, err
-	}
-	return r, nil
+	return stream, nil
 }
 
 func (lapi *Client) GetTask(id string) (*Task, error) {
 	var task Task
 	url := fmt.Sprintf("%s/api/task/%s", lapi.chosenServer, id)
-	if err := lapi.getJSON(url, "task", "get_task", &task); err != nil {
+	if err := lapi.getJSON(url, "task", "", &task); err != nil {
 		return nil, err
 	}
 	return &task, nil
 }
 
 func (lapi *Client) GetMultistreamTarget(id string) (*MultistreamTarget, error) {
-	rType := "get_multistream_target"
-	start := time.Now()
-	u := fmt.Sprintf("%s/api/multistream/target/%s", lapi.chosenServer, id)
-	req := lapi.getRequest(u)
-	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
-	resp, err := lapi.httpClient.Do(req)
-	if err != nil {
-		glog.Errorf("Error getting MultistreamTarget by id from Livepeer API server (%s) error: %v", u, err)
-		lapi.metrics.APIRequest(rType, 0, err)
+	var target MultistreamTarget
+	url := fmt.Sprintf("%s/api/multistream/target/%s", lapi.chosenServer, id)
+	if err := lapi.getJSON(url, "multistream_target", "", &target); err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		b, _ := ioutil.ReadAll(resp.Body)
-		glog.Errorf("Status error getting MultistreamTarget by id Livepeer API server (%s) status %d body: %s", u, resp.StatusCode, string(b))
-		if resp.StatusCode == http.StatusNotFound {
-			lapi.metrics.APIRequest(rType, 0, ErrNotExists)
-			return nil, ErrNotExists
-		}
-		err := errors.New(http.StatusText(resp.StatusCode))
-		lapi.metrics.APIRequest(rType, 0, err)
-		return nil, err
-	}
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		glog.Errorf("Error getting MultistreamTarget by id Livepeer API server (%s) error: %v", u, err)
-		lapi.metrics.APIRequest(rType, 0, err)
-		return nil, err
-	}
-	took := time.Since(start)
-	lapi.metrics.APIRequest(rType, took, nil)
-	bs := string(b)
-	glog.V(logs.VERBOSE).Info(bs)
-	if bs == "null" {
-		// API return null if stream does not exists
-		return nil, ErrNotExists
-	}
-	r := &MultistreamTarget{}
-	err = json.Unmarshal(b, r)
-	if err != nil {
-		return nil, err
-	}
-	return r, nil
+	return &target, nil
 }
 
 // GetMultistreamTargetR gets multistream target with retries
@@ -874,6 +804,9 @@ func (lapi *Client) getRequest(url string) *http.Request {
 }
 
 func (lapi *Client) getJSON(url, resourceType, metricName string, output interface{}) error {
+	if metricName == "" {
+		metricName = "get_" + resourceType
+	}
 	start := time.Now()
 	req := lapi.getRequest(url)
 	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
