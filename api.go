@@ -159,6 +159,23 @@ type (
 		} `json:"params"`
 	}
 
+	Asset struct {
+		ID            string `json:"id"`
+		UserID        string `json:"userId"`
+		CreatedAt     int64  `json:"createdAt"`
+		ObjectStoreID string `json:"objectStoreId"`
+	}
+
+	ObjectStore struct {
+		ID        string `json:"id"`
+		UserId    string `json:"userId"`
+		CreatedAt int64  `json:"createdAt"`
+		URL       string `json:"url"`
+		Name      string `json:"name,omitempty"`
+		PublicURL string `json:"publicUrl,omitempty"`
+		Disabled  bool   `json:"disabled"`
+	}
+
 	// // Profile ...
 	// Profile struct {
 	// 	Fps     int    `json:"fps"`
@@ -782,6 +799,24 @@ func (lapi *Client) GetMultistreamTargetR(id string) (*MultistreamTarget, error)
 		}
 		return target, err
 	}
+}
+
+func (lapi *Client) GetAsset(id string) (*Asset, error) {
+	var asset Asset
+	url := fmt.Sprintf("%s/api/asset/%s", lapi.chosenServer, id)
+	if err := lapi.getJSON(url, "asset", "", &asset); err != nil {
+		return nil, err
+	}
+	return &asset, nil
+}
+
+func (lapi *Client) GetObjectStore(id string) (*ObjectStore, error) {
+	var os ObjectStore
+	url := fmt.Sprintf("%s/api/object-store/%s", lapi.chosenServer, id)
+	if err := lapi.getJSON(url, "object_store", "", &os); err != nil {
+		return nil, err
+	}
+	return &os, nil
 }
 
 func Timedout(e error) bool {
