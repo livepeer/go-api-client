@@ -163,8 +163,9 @@ type (
 		} `json:"status"`
 	}
 
-	updateTaskStatusRequest struct {
-		Phase string `json:"phase"`
+	updateTaskProgressRequest struct {
+		Phase    string  `json:"phase,omitempty"`
+		Progress float64 `json:"progress,omitempty"`
 	}
 
 	Asset struct {
@@ -768,15 +769,17 @@ func (lapi *Client) GetTask(id string) (*Task, error) {
 	return &task, nil
 }
 
-func (lapi *Client) UpdateTaskStatus(id string, phase string) error {
-	url := fmt.Sprintf("%s/api/task/%s/status", lapi.chosenServer, id)
-	input := &updateTaskStatusRequest{Phase: phase}
-	var output json.RawMessage
-	err := lapi.doRequest("PATCH", url, "task", "update_task_status", input, &output)
+func (lapi *Client) UpdateTaskProgress(id string, phase string, progress float64) error {
+	var (
+		url    = fmt.Sprintf("%s/api/task/%s/status", lapi.chosenServer, id)
+		input  = &updateTaskProgressRequest{phase, progress}
+		output json.RawMessage
+	)
+	err := lapi.doRequest("POST", url, "task", "update_task_progress", input, &output)
 	if err != nil {
 		return err
 	}
-	glog.V(logs.DEBUG).Infof("Updated task status id=%s phase=%s output=%q", id, phase, string(output))
+	glog.V(logs.DEBUG).Infof("Updated task progress id=%s phase=%s progress=%v output=%q", id, phase, progress, string(output))
 	return nil
 }
 
