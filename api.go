@@ -408,7 +408,6 @@ func (lapi *Client) DeleteStream(id string) error {
 	if err != nil {
 		return err
 	}
-	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
 		glog.Errorf("Error deleting Livepeer stream %v", err)
@@ -449,29 +448,21 @@ func (lapi *Client) CreateStreamEx2(name string, record bool, parentID string, p
 	if len(profiles) > 0 {
 		reqs.Profiles = profiles
 	}
-	b, err := json.Marshal(reqs)
-	if err != nil {
-		glog.V(logs.SHORT).Infof("Error marshalling create stream request %v", err)
-		return nil, err
-	}
-	glog.Infof("Sending: %s", b)
 	u := fmt.Sprintf("%s/api/stream", lapi.chosenServer)
 	if parentID != "" {
 		u = fmt.Sprintf("%s/api/stream/%s/stream", lapi.chosenServer, parentID)
 	}
-	req, err := lapi.newRequest("POST", u, bytes.NewBuffer(b))
+	req, err := lapi.newRequest("POST", u, reqs)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
-	req.Header.Add("Content-Type", "application/json")
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
 		glog.Errorf("Error creating Livepeer stream %v", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
-	b, err = ioutil.ReadAll(resp.Body)
+	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		glog.Errorf("Error creating Livepeer stream (body) %v", err)
 		return nil, err
@@ -561,7 +552,6 @@ func (lapi *Client) GetSessionsNew(id string, forceUrl bool) ([]UserSession, err
 	}
 	start := time.Now()
 	req := lapi.getRequest(u)
-	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
 		glog.Errorf("Error getting sessions for stream by id from Livepeer API server (%s) error: %v", u, err)
@@ -610,7 +600,6 @@ func (lapi *Client) GetSessions(id string, forceUrl bool) ([]UserSession, error)
 	}
 	start := time.Now()
 	req := lapi.getRequest(u)
-	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
 		glog.Errorf("Error getting sessions for stream by id from Livepeer API server (%s) error: %v", u, err)
@@ -677,8 +666,7 @@ func (lapi *Client) SetActive(id string, active bool, startedAt time.Time) (bool
 	if !startedAt.IsZero() {
 		ar.StartedAt = startedAt.UnixNano() / int64(time.Millisecond)
 	}
-	b, _ := json.Marshal(&ar)
-	req, err := lapi.newRequest("PUT", u, bytes.NewBuffer(b))
+	req, err := lapi.newRequest("PUT", u, &ar)
 	if err != nil {
 		lapi.metrics.APIRequest("set_active", 0, err)
 		return true, err
@@ -687,8 +675,6 @@ func (lapi *Client) SetActive(id string, active bool, startedAt time.Time) (bool
 	defer cancel()
 	req = req.WithContext(ctx)
 
-	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
-	req.Header.Add("Content-Type", "application/json")
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
 		glog.Errorf("id=%s/setactive Error set active %v", id, err)
@@ -696,7 +682,7 @@ func (lapi *Client) SetActive(id string, active bool, startedAt time.Time) (bool
 		return true, err
 	}
 	defer resp.Body.Close()
-	b, err = ioutil.ReadAll(resp.Body)
+	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		glog.Errorf("id=%s/setactive Error set active (body) %v", err)
 		lapi.metrics.APIRequest("set_active", 0, err)
@@ -719,14 +705,11 @@ func (lapi *Client) DeactivateMany(ids []string) (int, error) {
 	dmreq := deactivateManyReq{
 		IDS: ids,
 	}
-	b, _ := json.Marshal(&dmreq)
-	req, err := lapi.newRequest("PATCH", u, bytes.NewBuffer(b))
+	req, err := lapi.newRequest("PATCH", u, &dmreq)
 	if err != nil {
 		lapi.metrics.APIRequest("deactivate-many", 0, err)
 		return 0, err
 	}
-	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
-	req.Header.Add("Content-Type", "application/json")
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
 		glog.Errorf("/deactivate-many err=%v", err)
@@ -734,7 +717,7 @@ func (lapi *Client) DeactivateMany(ids []string) (int, error) {
 		return 0, err
 	}
 	defer resp.Body.Close()
-	b, err = ioutil.ReadAll(resp.Body)
+	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		glog.Errorf("deactivate-many body err=%v", err)
 		lapi.metrics.APIRequest("deactivate-many", 0, err)
@@ -826,10 +809,22 @@ func Timedout(e error) bool {
 	return ok && t.Timeout() || (e != nil && strings.Contains(e.Error(), "Client.Timeout"))
 }
 
-func (lapi *Client) newRequest(method, url string, body io.Reader) (*http.Request, error) {
+func (lapi *Client) newRequest(method, url string, bodyObj interface{}) (*http.Request, error) {
+	var body io.Reader
+	if bodyObj != nil {
+		b, err := json.Marshal(bodyObj)
+		if err != nil {
+			return nil, fmt.Errorf("error marshalling body: %w", err)
+		}
+		body = bytes.NewBuffer(b)
+	}
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, err
+	}
+	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
+	if body != nil {
+		req.Header.Add("Content-Type", "application/json")
 	}
 	if lapi.userAgent != "" {
 		req.Header.Add("User-Agent", lapi.userAgent)
@@ -851,7 +846,6 @@ func (lapi *Client) getJSON(url, resourceType, metricName string, output interfa
 	}
 	start := time.Now()
 	req := lapi.getRequest(url)
-	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
 
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
