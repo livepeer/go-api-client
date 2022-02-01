@@ -157,6 +157,14 @@ type (
 				URL string `json:"url"`
 			} `json:"import"`
 		} `json:"params"`
+		Status struct {
+			Phase     string `json:"phase"`
+			UpdatedAt int64  `json:"updatedAt"`
+		} `json:"status"`
+	}
+
+	updateTaskStatusRequest struct {
+		Phase string `json:"phase"`
 	}
 
 	Asset struct {
@@ -760,6 +768,18 @@ func (lapi *Client) GetTask(id string) (*Task, error) {
 	return &task, nil
 }
 
+func (lapi *Client) UpdateTaskStatus(id string, phase string) error {
+	url := fmt.Sprintf("%s/api/task/%s/status", lapi.chosenServer, id)
+	input := &updateTaskStatusRequest{Phase: phase}
+	var output json.RawMessage
+	err := lapi.doRequest("PATCH", url, "task", "update_task_status", input, &output)
+	if err != nil {
+		return err
+	}
+	glog.V(logs.DEBUG).Infof("Updated task status id=%s phase=%s output=%q", id, phase, string(output))
+	return nil
+}
+
 func (lapi *Client) GetMultistreamTarget(id string) (*MultistreamTarget, error) {
 	var target MultistreamTarget
 	url := fmt.Sprintf("%s/api/multistream/target/%s", lapi.chosenServer, id)
@@ -841,23 +861,30 @@ func (lapi *Client) getRequest(url string) *http.Request {
 }
 
 func (lapi *Client) getJSON(url, resourceType, metricName string, output interface{}) error {
+	return lapi.doRequest("GET", url, resourceType, metricName, nil, output)
+}
+
+func (lapi *Client) doRequest(method, url, resourceType, metricName string, input, output interface{}) error {
 	if metricName == "" {
-		metricName = "get_" + resourceType
+		metricName = strings.ToLower(method + "_" + resourceType)
 	}
 	start := time.Now()
-	req := lapi.getRequest(url)
+	req, err := lapi.newRequest(method, url, input)
+	if err != nil {
+		return err
+	}
 
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
-		glog.Errorf("Error getting object from Livepeer API resource=%s url=%s error=%q", resourceType, url, err)
+		glog.Errorf("Error calling Livepeer API resource=%s method=%s url=%s error=%q", resourceType, method, url, err)
 		lapi.metrics.APIRequest(metricName, 0, err)
 		return err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if (method == "GET" && resp.StatusCode != http.StatusOK) || (resp.StatusCode >= 300) {
 		b, _ := ioutil.ReadAll(resp.Body)
-		glog.Errorf("Status error from Livepeer API resource=%s url=%s status=%d body=%q", resourceType, url, resp.StatusCode, string(b))
+		glog.Errorf("Status error from Livepeer API resource=%s method=%s url=%s status=%d body=%q", resourceType, url, method, resp.StatusCode, string(b))
 		if resp.StatusCode == http.StatusNotFound {
 			lapi.metrics.APIRequest(metricName, 0, ErrNotExists)
 			return ErrNotExists
@@ -869,7 +896,7 @@ func (lapi *Client) getJSON(url, resourceType, metricName string, output interfa
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		glog.Errorf("Error reading Livepeer API response body resource=%s url=%s error=%q", resourceType, url, err)
+		glog.Errorf("Error reading Livepeer API response body resource=%s method=%s url=%s error=%q", resourceType, method, url, err)
 		lapi.metrics.APIRequest(metricName, 0, err)
 		return err
 	}
