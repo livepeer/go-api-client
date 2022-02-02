@@ -170,6 +170,7 @@ type (
 
 	Asset struct {
 		ID            string `json:"id"`
+		PlaybackID    string `json:"playbackId"`
 		UserID        string `json:"userId"`
 		CreatedAt     int64  `json:"createdAt"`
 		ObjectStoreID string `json:"objectStoreId"`
