@@ -174,6 +174,42 @@ type (
 		UserID        string `json:"userId"`
 		CreatedAt     int64  `json:"createdAt"`
 		ObjectStoreID string `json:"objectStoreId"`
+		AssetSpec
+	}
+
+	AssetSpec struct {
+		Name      string          `json:"name,omitempty"`
+		Hash      []AssetHash     `json:"hash"`
+		VideoSpec *AssetVideoSpec `json:"videoSpec,omitempty"`
+	}
+
+	AssetHash struct {
+		Hash      string `json:"hash"`
+		Algorithm string `json:"algorithm"`
+	}
+
+	AssetVideoSpec struct {
+		Format      string        `json:"format"`
+		DurationSec float64       `json:"duration"`
+		Bitrate     float64       `json:"bitrate"` // TODO: add to API
+		Tracks      []*AssetTrack `json:"tracks"`
+	}
+
+	AssetTrack struct {
+		Type string `json:"type"`
+		// TODO: Remove ID from API
+		Codec       string  `json:"codec"`
+		StartTime   float64 `json:"startTime"` // TODO: add to API
+		DurationSec float64 `json:"duration"`
+		Bitrate     float64 `json:"bitrate"`
+		// video track fields
+		Width  int `json:"width,omitempty"`
+		Height int `json:"height,omitempty"`
+		FPS    int `json:"fps,omitempty"`
+		// auido track fields
+		Channels   int `json:"channels,omitempty"`
+		SampleRate int `json:"smapleRate,omitempty"`
+		BitDepth   int `json:"bitDepth,omitempty"`
 	}
 
 	ObjectStore struct {
