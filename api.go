@@ -179,6 +179,7 @@ type (
 
 	AssetSpec struct {
 		Name      string          `json:"name,omitempty"`
+		Size      int64           `json:"size"`
 		Hash      []AssetHash     `json:"hash"`
 		VideoSpec *AssetVideoSpec `json:"videoSpec,omitempty"`
 	}
@@ -203,9 +204,10 @@ type (
 		DurationSec float64 `json:"duration"`
 		Bitrate     float64 `json:"bitrate"`
 		// video track fields
-		Width  int `json:"width,omitempty"`
-		Height int `json:"height,omitempty"`
-		FPS    int `json:"fps,omitempty"`
+		Width       int     `json:"width,omitempty"`
+		Height      int     `json:"height,omitempty"`
+		FPS         float64 `json:"fps,omitempty"`
+		PixelFormat string  `json:"pixelFormat,omitempty"`
 		// auido track fields
 		Channels   int `json:"channels,omitempty"`
 		SampleRate int `json:"smapleRate,omitempty"`
