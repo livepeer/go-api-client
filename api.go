@@ -161,11 +161,9 @@ type (
 
 	TaskParams struct {
 		Import *struct {
-			URL string `json:"url"`
+			URL               string `json:"url,omitempty"`
+			UploadedObjectKey string `json:"uploadedObjectKey,omitempty"`
 		} `json:"import"`
-		DirectUpload *struct {
-			ObjectKey string `json:"objectKey"`
-		} `json:"directUpload"`
 	}
 
 	updateTaskProgressRequest struct {
@@ -197,7 +195,7 @@ type (
 	AssetVideoSpec struct {
 		Format      string        `json:"format"`
 		DurationSec float64       `json:"duration"`
-		Bitrate     float64       `json:"bitrate"` // TODO: add to API
+		Bitrate     float64       `json:"bitrate,omitempty"` // TODO: add to API
 		Tracks      []*AssetTrack `json:"tracks"`
 	}
 
@@ -205,9 +203,9 @@ type (
 		Type string `json:"type"`
 		// TODO: Remove ID from API
 		Codec       string  `json:"codec"`
-		StartTime   float64 `json:"startTime"` // TODO: add to API
-		DurationSec float64 `json:"duration"`
-		Bitrate     float64 `json:"bitrate"`
+		StartTime   float64 `json:"startTime,omitempty"` // TODO: add to API
+		DurationSec float64 `json:"duration,omitempty"`
+		Bitrate     float64 `json:"bitrate,omitempty"`
 		// video track fields
 		Width       int     `json:"width,omitempty"`
 		Height      int     `json:"height,omitempty"`
