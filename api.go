@@ -147,20 +147,25 @@ type (
 	}
 
 	Task struct {
-		ID            string `json:"id"`
-		UserID        string `json:"userId"`
-		CreatedAt     int64  `json:"createdAt"`
-		ParentAssetID string `json:"parentAssetId"`
-		Type          string `json:"type"`
-		Params        struct {
-			Import *struct {
-				URL string `json:"url"`
-			} `json:"import"`
-		} `json:"params"`
-		Status struct {
+		ID            string     `json:"id"`
+		UserID        string     `json:"userId"`
+		CreatedAt     int64      `json:"createdAt"`
+		ParentAssetID string     `json:"parentAssetId"`
+		Type          string     `json:"type"`
+		Params        TaskParams `json:"params"`
+		Status        struct {
 			Phase     string `json:"phase"`
 			UpdatedAt int64  `json:"updatedAt"`
 		} `json:"status"`
+	}
+
+	TaskParams struct {
+		Import *struct {
+			URL string `json:"url"`
+		} `json:"import"`
+		DirectUpload *struct {
+			ObjectKey string `json:"objectKey"`
+		} `json:"directUpload"`
 	}
 
 	updateTaskProgressRequest struct {
