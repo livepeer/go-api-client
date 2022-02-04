@@ -19,8 +19,8 @@ import (
 	"github.com/livepeer/go-api-client/metrics"
 )
 
-// ErrNotExists returned if stream is not found
-var ErrNotExists = errors.New("stream does not exist")
+// ErrNotExists returned if receives a 404 error from the API
+var ErrNotExists = errors.New("not found")
 
 const httpTimeout = 4 * time.Second
 const setActiveTimeout = 1500 * time.Millisecond
@@ -155,10 +155,13 @@ type (
 		Params        struct {
 			Import *ImportTaskParams `json:"import"`
 		} `json:"params"`
-		Status struct {
-			Phase     string `json:"phase"`
-			UpdatedAt int64  `json:"updatedAt"`
-		} `json:"status"`
+		Status TaskStatus `json:"status"`
+	}
+
+	TaskStatus struct {
+		Phase     string  `json:"phase"`
+		Progress  float64 `json:"progress"`
+		UpdatedAt int64   `json:"updatedAt,omitempty"`
 	}
 
 	ImportTaskParams struct {
@@ -167,8 +170,7 @@ type (
 	}
 
 	updateTaskProgressRequest struct {
-		Phase    string  `json:"phase,omitempty"`
-		Progress float64 `json:"progress,omitempty"`
+		Status TaskStatus `json:"status"`
 	}
 
 	Asset struct {
@@ -811,10 +813,10 @@ func (lapi *Client) GetTask(id string) (*Task, error) {
 	return &task, nil
 }
 
-func (lapi *Client) UpdateTaskProgress(id string, phase string, progress float64) error {
+func (lapi *Client) UpdateTaskStatus(id string, phase string, progress float64) error {
 	var (
 		url    = fmt.Sprintf("%s/api/task/%s/status", lapi.chosenServer, id)
-		input  = &updateTaskProgressRequest{phase, progress}
+		input  = &updateTaskProgressRequest{Status: TaskStatus{phase, progress, 0}}
 		output json.RawMessage
 	)
 	err := lapi.doRequest("POST", url, "task", "update_task_progress", input, &output)
@@ -929,7 +931,7 @@ func (lapi *Client) doRequest(method, url, resourceType, metricName string, inpu
 
 	if (method == "GET" && resp.StatusCode != http.StatusOK) || (resp.StatusCode >= 300) {
 		b, _ := ioutil.ReadAll(resp.Body)
-		glog.Errorf("Status error from Livepeer API resource=%s method=%s url=%s status=%d body=%q", resourceType, url, method, resp.StatusCode, string(b))
+		glog.Errorf("Status error from Livepeer API resource=%s method=%s url=%s status=%d body=%q", resourceType, method, url, resp.StatusCode, string(b))
 		if resp.StatusCode == http.StatusNotFound {
 			lapi.metrics.APIRequest(metricName, 0, ErrNotExists)
 			return ErrNotExists
