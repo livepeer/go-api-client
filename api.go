@@ -185,7 +185,7 @@ type (
 	AssetSpec struct {
 		Name      string          `json:"name,omitempty"`
 		Type      string          `json:"type"`
-		Size      int64           `json:"size"`
+		Size      uint64          `json:"size"`
 		Hash      []AssetHash     `json:"hash"`
 		VideoSpec *AssetVideoSpec `json:"videoSpec,omitempty"`
 	}
