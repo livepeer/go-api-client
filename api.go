@@ -150,7 +150,8 @@ type (
 		ID            string `json:"id"`
 		UserID        string `json:"userId"`
 		CreatedAt     int64  `json:"createdAt"`
-		ParentAssetID string `json:"parentAssetId"`
+		InputAssetID  string `json:"inputAssetId,omitempty"`
+		OutputAssetID string `json:"outputtAssetId,omitempty"`
 		Type          string `json:"type"`
 		Params        struct {
 			Import *ImportTaskParams `json:"import"`
@@ -178,6 +179,7 @@ type (
 		PlaybackID    string `json:"playbackId"`
 		UserID        string `json:"userId"`
 		CreatedAt     int64  `json:"createdAt"`
+		SourceAssetId string `json:"sourceAssetId,omitempty"`
 		ObjectStoreID string `json:"objectStoreId"`
 		AssetSpec
 	}
