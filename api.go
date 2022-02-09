@@ -151,7 +151,7 @@ type (
 		UserID        string `json:"userId"`
 		CreatedAt     int64  `json:"createdAt"`
 		InputAssetID  string `json:"inputAssetId,omitempty"`
-		OutputAssetID string `json:"outputtAssetId,omitempty"`
+		OutputAssetID string `json:"outputAssetId,omitempty"`
 		Type          string `json:"type"`
 		Params        struct {
 			Import *ImportTaskParams `json:"import"`
