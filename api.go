@@ -155,6 +155,7 @@ type (
 		Type          string `json:"type"`
 		Params        struct {
 			Import *ImportTaskParams `json:"import"`
+			Export *ExportTaskParams `json:"export"`
 		} `json:"params"`
 		Status TaskStatus `json:"status"`
 	}
@@ -168,6 +169,22 @@ type (
 	ImportTaskParams struct {
 		URL               string `json:"url,omitempty"`
 		UploadedObjectKey string `json:"uploadedObjectKey,omitempty"`
+	}
+
+	ExportTaskParams struct {
+		Custom *struct {
+			URL     string            `json:"url"`
+			Method  string            `json:"method,omitempty"`
+			Headers map[string]string `json:"headers,omitempty"`
+		} `json:"custom,omitempty"`
+		IPFS *struct {
+			Pinata *struct {
+				JWT       string `json:"jwt,omitempty"`
+				APIKey    string `json:"apiKey,omitempty"`
+				APISecret string `json:"apiSecret,omitempty"`
+			} `json:"pinata,omitempty"`
+			ERC1155Metadata map[string]interface{} `json:"erc1155Metadata,omitempty"`
+		} `json:"ipfs,omitempty"`
 	}
 
 	updateTaskProgressRequest struct {
