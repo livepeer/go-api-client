@@ -234,7 +234,7 @@ type (
 		FPS         float64 `json:"fps,omitempty"`
 		// auido track fields
 		Channels   int `json:"channels,omitempty"`
-		SampleRate int `json:"smapleRate,omitempty"`
+		SampleRate int `json:"sampleRate,omitempty"`
 		BitDepth   int `json:"bitDepth,omitempty"`
 	}
 
