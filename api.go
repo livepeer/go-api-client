@@ -9,14 +9,27 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime"
+	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/livepeer/go-api-client/logs"
 	"github.com/livepeer/go-api-client/metrics"
+)
+
+const (
+	SHORT    = 4
+	DEBUG    = 5
+	VERBOSE  = 6
+	VVERBOSE = 7
+	INSANE   = 12
+	INSANE2  = 14
 )
 
 // ErrNotExists returned if receives a 404 error from the API
@@ -59,6 +72,7 @@ type (
 
 		chosenServer string
 		httpClient   *http.Client
+		broadcasters []string
 	}
 
 	geoResp struct {
@@ -96,6 +110,7 @@ type (
 		FpsDen  int    `json:"fpsDen,omitempty"`
 		Gop     string `json:"gop,omitempty"`
 		Profile string `json:"profile,omitempty"` // enum: - H264Baseline - H264Main - H264High - H264ConstrainedHigh
+		Encoder string `json:"encoder,omitempty"` // enum: - h264, h265, vp8, vp9
 	}
 
 	MultistreamTargetRef struct {
@@ -147,15 +162,17 @@ type (
 	}
 
 	Task struct {
-		ID            string `json:"id"`
-		UserID        string `json:"userId"`
-		CreatedAt     int64  `json:"createdAt"`
-		InputAssetID  string `json:"inputAssetId,omitempty"`
-		OutputAssetID string `json:"outputAssetId,omitempty"`
-		Type          string `json:"type"`
-		Params        struct {
-			Import *ImportTaskParams `json:"import"`
-			Export *ExportTaskParams `json:"export"`
+		ID              string   `json:"id"`
+		UserID          string   `json:"userId"`
+		CreatedAt       int64    `json:"createdAt"`
+		InputAssetID    string   `json:"inputAssetId,omitempty"`
+		OutputAssetID   string   `json:"outputAssetId,omitempty"`
+		OutputAssetsIDs []string `json:"outputAssetsIds,omitempty"`
+		Type            string   `json:"type"`
+		Params          struct {
+			Import    *ImportTaskParams    `json:"import"`
+			Export    *ExportTaskParams    `json:"export"`
+			Transcode *TranscodeTaskParams `json:"transcode"`
 		} `json:"params"`
 		Status TaskStatus `json:"status"`
 	}
@@ -185,6 +202,9 @@ type (
 			} `json:"pinata,omitempty"`
 			ERC1155Metadata map[string]interface{} `json:"erc1155Metadata,omitempty"`
 		} `json:"ipfs,omitempty"`
+	}
+	TranscodeTaskParams struct {
+		Profiles []Profile `json:"profiles,omitempty"`
 	}
 
 	updateTaskProgressRequest struct {
@@ -970,4 +990,112 @@ func (lapi *Client) doRequest(method, url, resourceType, metricName string, inpu
 	lapi.metrics.APIRequest(metricName, took, nil)
 
 	return json.Unmarshal(b, output)
+}
+
+func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segData []byte) ([][]byte, error) {
+	var err error
+	if len(lapi.broadcasters) == 0 {
+		lapi.broadcasters, err = lapi.Broadcasters()
+		if err != nil {
+			return nil, err
+		}
+		if len(lapi.broadcasters) == 0 {
+			return nil, fmt.Errorf("no broadcasters available")
+		}
+	}
+	urlToUp := fmt.Sprintf("%s/live/%s/%d.ts", lapi.broadcasters[0], sid, seqNo)
+	var body io.Reader
+	body = bytes.NewReader(segData)
+	req, err := http.NewRequest("POST", urlToUp, body)
+	if err != nil {
+		panic(err)
+	}
+	req.Header.Set("Accept", "multipart/mixed")
+	req.Header.Set("Content-Duration", strconv.FormatInt(dur.Milliseconds(), 10))
+	postStarted := time.Now()
+	resp, err := lapi.httpClient.Do(req)
+	postTook := time.Since(postStarted)
+	var timedout bool
+	var status string
+	if err != nil {
+		uerr := err.(*url.Error)
+		timedout = uerr.Timeout()
+	}
+	if resp != nil {
+		status = resp.Status
+	}
+	glog.V(DEBUG).Infof("Post segment manifest=%s seqNo=%d dur=%s took=%s timed_out=%v status='%v' err=%v",
+		sid, seqNo, dur, postTook, timedout, status, err)
+	if err != nil {
+		return nil, err
+	}
+	glog.V(VERBOSE).Infof("Got transcoded manifest=%s seqNo=%d resp status=%s reading body started", sid, seqNo, resp.Status)
+	if resp.StatusCode != http.StatusOK {
+		b, _ := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+		glog.V(DEBUG).Infof("Got manifest=%s seqNo=%d resp status=%s error in body $%s", sid, seqNo, resp.Status, string(b))
+		return nil, fmt.Errorf("transcode error %s: %s", resp.Status, b)
+	}
+	started := time.Now()
+	mediaType, params, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+	if err != nil {
+		glog.Error("Error getting mime type ", err, sid)
+		panic(err)
+		// return
+	}
+	glog.V(VERBOSE).Infof("mediaType=%s params=%+v", mediaType, params)
+	if glog.V(VVERBOSE) {
+		for k, v := range resp.Header {
+			glog.Infof("Header '%s': '%s'", k, v)
+		}
+	}
+	var segments [][]byte
+	var urls []string
+	if mediaType == "multipart/mixed" {
+		mr := multipart.NewReader(resp.Body, params["boundary"])
+		for {
+			p, merr := mr.NextPart()
+			if merr == io.EOF {
+				break
+			}
+			if merr != nil {
+				glog.Error("Could not process multipart part ", merr, sid)
+				err = merr
+				break
+			}
+			mediaType, _, err := mime.ParseMediaType(p.Header.Get("Content-Type"))
+			if err != nil {
+				glog.Error("Error getting mime type ", err, sid)
+				for k, v := range p.Header {
+					glog.Infof("Header '%s': '%s'", k, v)
+				}
+			}
+			body, merr := ioutil.ReadAll(p)
+			if merr != nil {
+				glog.Errorf("error reading body manifest=%s seqNo=%d err=%v", sid, seqNo, merr)
+				err = merr
+				break
+			}
+			if mediaType == "application/vnd+livepeer.uri" {
+				urls = append(urls, string(body))
+			} else {
+				var v glog.Level = DEBUG
+				if len(body) < 5 {
+					v = 0
+				}
+				glog.V(v).Infof("Read back segment for manifest=%s seqNo=%d profile=%d len=%d bytes", sid, seqNo, len(segments), len(body))
+				segments = append(segments, body)
+			}
+		}
+	}
+	took := time.Since(started)
+	glog.V(VERBOSE).Infof("Reading body back for manifest=%s seqNo=%d took=%s profiles=%d", sid, seqNo, took, len(segments))
+	// glog.Infof("Body: %s", string(tbody))
+
+	if err != nil {
+		httpErr := fmt.Errorf(`error reading http request body for manifest=%s seqNo=%d err=%w`, sid, seqNo, err)
+		glog.Error(httpErr)
+		return nil, err
+	}
+	return segments, nil
 }
