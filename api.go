@@ -1009,7 +1009,7 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 	body = bytes.NewReader(segData)
 	req, err := http.NewRequest("POST", urlToUp, body)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	req.Header.Set("Accept", "multipart/mixed")
 	req.Header.Set("Content-Duration", strconv.FormatInt(dur.Milliseconds(), 10))
@@ -1040,9 +1040,9 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 	started := time.Now()
 	mediaType, params, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 	if err != nil {
-		glog.Error("Error getting mime type ", err, sid)
-		panic(err)
-		// return
+		err = fmt.Errorf("error getting mime type manifestID=%s err=%w", sid, err)
+		glog.Error(err)
+		return nil, err
 	}
 	glog.V(VERBOSE).Infof("mediaType=%s params=%+v", mediaType, params)
 	if glog.V(VVERBOSE) {
