@@ -200,9 +200,10 @@ type (
 				APIKey    string `json:"apiKey,omitempty"`
 				APISecret string `json:"apiSecret,omitempty"`
 			} `json:"pinata,omitempty"`
-			ERC1155Metadata map[string]interface{} `json:"erc1155Metadata,omitempty"`
+			NFTMetadata map[string]interface{} `json:"nftMetadata,omitempty"`
 		} `json:"ipfs,omitempty"`
 	}
+
 	TranscodeTaskParams struct {
 		Profiles []Profile `json:"profiles,omitempty"`
 	}
