@@ -162,14 +162,13 @@ type (
 	}
 
 	Task struct {
-		ID              string   `json:"id"`
-		UserID          string   `json:"userId"`
-		CreatedAt       int64    `json:"createdAt"`
-		InputAssetID    string   `json:"inputAssetId,omitempty"`
-		OutputAssetID   string   `json:"outputAssetId,omitempty"`
-		OutputAssetsIDs []string `json:"outputAssetsIds,omitempty"`
-		Type            string   `json:"type"`
-		Params          struct {
+		ID            string `json:"id"`
+		UserID        string `json:"userId"`
+		CreatedAt     int64  `json:"createdAt"`
+		InputAssetID  string `json:"inputAssetId,omitempty"`
+		OutputAssetID string `json:"outputAssetId,omitempty"`
+		Type          string `json:"type"`
+		Params        struct {
 			Import    *ImportTaskParams    `json:"import"`
 			Export    *ExportTaskParams    `json:"export"`
 			Transcode *TranscodeTaskParams `json:"transcode"`
@@ -205,7 +204,7 @@ type (
 	}
 
 	TranscodeTaskParams struct {
-		Profiles []Profile `json:"profiles,omitempty"`
+		Profile Profile `json:"profile,omitempty"`
 	}
 
 	updateTaskProgressRequest struct {
