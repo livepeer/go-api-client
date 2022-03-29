@@ -9,8 +9,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime"
+	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,8 +23,17 @@ import (
 	"github.com/livepeer/go-api-client/metrics"
 )
 
-// ErrNotExists returned if stream is not found
-var ErrNotExists = errors.New("stream does not exist")
+const (
+	SHORT    = 4
+	DEBUG    = 5
+	VERBOSE  = 6
+	VVERBOSE = 7
+	INSANE   = 12
+	INSANE2  = 14
+)
+
+// ErrNotExists returned if receives a 404 error from the API
+var ErrNotExists = errors.New("not found")
 
 const httpTimeout = 4 * time.Second
 const setActiveTimeout = 1500 * time.Millisecond
@@ -59,6 +72,7 @@ type (
 
 		chosenServer string
 		httpClient   *http.Client
+		broadcasters []string
 	}
 
 	geoResp struct {
@@ -96,6 +110,7 @@ type (
 		FpsDen  int    `json:"fpsDen,omitempty"`
 		Gop     string `json:"gop,omitempty"`
 		Profile string `json:"profile,omitempty"` // enum: - H264Baseline - H264Main - H264High - H264ConstrainedHigh
+		Encoder string `json:"encoder,omitempty"` // enum: - h264, h265, vp8, vp9
 	}
 
 	MultistreamTargetRef struct {
@@ -141,9 +156,117 @@ type (
 		ID        string `json:"id,omitempty"`
 		URL       string `json:"url,omitempty"`
 		Name      string `json:"name,omitempty"`
-		UserId    string `json:"userId,omitempty"`
+		UserID    string `json:"userId,omitempty"`
 		Disabled  bool   `json:"disabled,omitempty"`
 		CreatedAt int64  `json:"createdAt,omitempty"`
+	}
+
+	Task struct {
+		ID              string   `json:"id"`
+		UserID          string   `json:"userId"`
+		CreatedAt       int64    `json:"createdAt"`
+		InputAssetID    string   `json:"inputAssetId,omitempty"`
+		OutputAssetID   string   `json:"outputAssetId,omitempty"`
+		OutputAssetsIDs []string `json:"outputAssetsIds,omitempty"`
+		Type            string   `json:"type"`
+		Params          struct {
+			Import    *ImportTaskParams    `json:"import"`
+			Export    *ExportTaskParams    `json:"export"`
+			Transcode *TranscodeTaskParams `json:"transcode"`
+		} `json:"params"`
+		Status TaskStatus `json:"status"`
+	}
+
+	TaskStatus struct {
+		Phase     string  `json:"phase"`
+		Progress  float64 `json:"progress"`
+		UpdatedAt int64   `json:"updatedAt,omitempty"`
+	}
+
+	ImportTaskParams struct {
+		URL               string `json:"url,omitempty"`
+		UploadedObjectKey string `json:"uploadedObjectKey,omitempty"`
+	}
+
+	ExportTaskParams struct {
+		Custom *struct {
+			URL     string            `json:"url"`
+			Method  string            `json:"method,omitempty"`
+			Headers map[string]string `json:"headers,omitempty"`
+		} `json:"custom,omitempty"`
+		IPFS *struct {
+			Pinata *struct {
+				JWT       string `json:"jwt,omitempty"`
+				APIKey    string `json:"apiKey,omitempty"`
+				APISecret string `json:"apiSecret,omitempty"`
+			} `json:"pinata,omitempty"`
+			NFTMetadata map[string]interface{} `json:"nftMetadata,omitempty"`
+		} `json:"ipfs,omitempty"`
+	}
+
+	TranscodeTaskParams struct {
+		Profiles []Profile `json:"profiles,omitempty"`
+	}
+
+	updateTaskProgressRequest struct {
+		Status TaskStatus `json:"status"`
+	}
+
+	Asset struct {
+		ID            string `json:"id"`
+		PlaybackID    string `json:"playbackId"`
+		UserID        string `json:"userId"`
+		CreatedAt     int64  `json:"createdAt"`
+		SourceAssetId string `json:"sourceAssetId,omitempty"`
+		ObjectStoreID string `json:"objectStoreId"`
+		AssetSpec
+	}
+
+	AssetSpec struct {
+		Name      string          `json:"name,omitempty"`
+		Type      string          `json:"type"`
+		Size      uint64          `json:"size"`
+		Hash      []AssetHash     `json:"hash"`
+		VideoSpec *AssetVideoSpec `json:"videoSpec,omitempty"`
+	}
+
+	AssetHash struct {
+		Hash      string `json:"hash"`
+		Algorithm string `json:"algorithm"`
+	}
+
+	AssetVideoSpec struct {
+		Format      string        `json:"format"`
+		DurationSec float64       `json:"duration"`
+		Bitrate     float64       `json:"bitrate,omitempty"`
+		Tracks      []*AssetTrack `json:"tracks"`
+	}
+
+	AssetTrack struct {
+		Type        string  `json:"type"`
+		Codec       string  `json:"codec"`
+		StartTime   float64 `json:"startTime,omitempty"`
+		DurationSec float64 `json:"duration,omitempty"`
+		Bitrate     float64 `json:"bitrate,omitempty"`
+		// video track fields
+		Width       int     `json:"width,omitempty"`
+		Height      int     `json:"height,omitempty"`
+		PixelFormat string  `json:"pixelFormat,omitempty"`
+		FPS         float64 `json:"fps,omitempty"`
+		// auido track fields
+		Channels   int `json:"channels,omitempty"`
+		SampleRate int `json:"sampleRate,omitempty"`
+		BitDepth   int `json:"bitDepth,omitempty"`
+	}
+
+	ObjectStore struct {
+		ID        string `json:"id"`
+		UserId    string `json:"userId"`
+		CreatedAt int64  `json:"createdAt"`
+		URL       string `json:"url"`
+		Name      string `json:"name,omitempty"`
+		PublicURL string `json:"publicUrl,omitempty"`
+		Disabled  bool   `json:"disabled"`
 	}
 
 	// // Profile ...
@@ -378,7 +501,6 @@ func (lapi *Client) DeleteStream(id string) error {
 	if err != nil {
 		return err
 	}
-	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
 		glog.Errorf("Error deleting Livepeer stream %v", err)
@@ -419,29 +541,21 @@ func (lapi *Client) CreateStreamEx2(name string, record bool, parentID string, p
 	if len(profiles) > 0 {
 		reqs.Profiles = profiles
 	}
-	b, err := json.Marshal(reqs)
-	if err != nil {
-		glog.V(logs.SHORT).Infof("Error marshalling create stream request %v", err)
-		return nil, err
-	}
-	glog.Infof("Sending: %s", b)
 	u := fmt.Sprintf("%s/api/stream", lapi.chosenServer)
 	if parentID != "" {
 		u = fmt.Sprintf("%s/api/stream/%s/stream", lapi.chosenServer, parentID)
 	}
-	req, err := lapi.newRequest("POST", u, bytes.NewBuffer(b))
+	req, err := lapi.newRequest("POST", u, reqs)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
-	req.Header.Add("Content-Type", "application/json")
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
 		glog.Errorf("Error creating Livepeer stream %v", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
-	b, err = ioutil.ReadAll(resp.Body)
+	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		glog.Errorf("Error creating Livepeer stream (body) %v", err)
 		return nil, err
@@ -531,7 +645,6 @@ func (lapi *Client) GetSessionsNew(id string, forceUrl bool) ([]UserSession, err
 	}
 	start := time.Now()
 	req := lapi.getRequest(u)
-	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
 		glog.Errorf("Error getting sessions for stream by id from Livepeer API server (%s) error: %v", u, err)
@@ -580,7 +693,6 @@ func (lapi *Client) GetSessions(id string, forceUrl bool) ([]UserSession, error)
 	}
 	start := time.Now()
 	req := lapi.getRequest(u)
-	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
 		glog.Errorf("Error getting sessions for stream by id from Livepeer API server (%s) error: %v", u, err)
@@ -647,8 +759,7 @@ func (lapi *Client) SetActive(id string, active bool, startedAt time.Time) (bool
 	if !startedAt.IsZero() {
 		ar.StartedAt = startedAt.UnixNano() / int64(time.Millisecond)
 	}
-	b, _ := json.Marshal(&ar)
-	req, err := lapi.newRequest("PUT", u, bytes.NewBuffer(b))
+	req, err := lapi.newRequest("PUT", u, &ar)
 	if err != nil {
 		lapi.metrics.APIRequest("set_active", 0, err)
 		return true, err
@@ -657,8 +768,6 @@ func (lapi *Client) SetActive(id string, active bool, startedAt time.Time) (bool
 	defer cancel()
 	req = req.WithContext(ctx)
 
-	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
-	req.Header.Add("Content-Type", "application/json")
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
 		glog.Errorf("id=%s/setactive Error set active %v", id, err)
@@ -666,7 +775,7 @@ func (lapi *Client) SetActive(id string, active bool, startedAt time.Time) (bool
 		return true, err
 	}
 	defer resp.Body.Close()
-	b, err = ioutil.ReadAll(resp.Body)
+	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		glog.Errorf("id=%s/setactive Error set active (body) %v", err)
 		lapi.metrics.APIRequest("set_active", 0, err)
@@ -689,14 +798,11 @@ func (lapi *Client) DeactivateMany(ids []string) (int, error) {
 	dmreq := deactivateManyReq{
 		IDS: ids,
 	}
-	b, _ := json.Marshal(&dmreq)
-	req, err := lapi.newRequest("PATCH", u, bytes.NewBuffer(b))
+	req, err := lapi.newRequest("PATCH", u, &dmreq)
 	if err != nil {
 		lapi.metrics.APIRequest("deactivate-many", 0, err)
 		return 0, err
 	}
-	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
-	req.Header.Add("Content-Type", "application/json")
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
 		glog.Errorf("/deactivate-many err=%v", err)
@@ -704,7 +810,7 @@ func (lapi *Client) DeactivateMany(ids []string) (int, error) {
 		return 0, err
 	}
 	defer resp.Body.Close()
-	b, err = ioutil.ReadAll(resp.Body)
+	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		glog.Errorf("deactivate-many body err=%v", err)
 		lapi.metrics.APIRequest("deactivate-many", 0, err)
@@ -727,94 +833,47 @@ func (lapi *Client) DeactivateMany(ids []string) (int, error) {
 	return mr.RowCount, nil
 }
 
-func (lapi *Client) getStream(u, rType string) (*CreateStreamResp, error) {
-	start := time.Now()
-	req := lapi.getRequest(u)
-	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
-	resp, err := lapi.httpClient.Do(req)
-	if err != nil {
-		glog.Errorf("Error getting stream by id from Livepeer API server (%s) error: %v", u, err)
-		lapi.metrics.APIRequest(rType, 0, err)
+func (lapi *Client) getStream(url, metricName string) (*CreateStreamResp, error) {
+	var stream *CreateStreamResp
+	if err := lapi.getJSON(url, "stream", metricName, &stream); err != nil {
 		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		b, _ := ioutil.ReadAll(resp.Body)
-		glog.Errorf("Status error getting stream by id Livepeer API server (%s) status %d body: %s", u, resp.StatusCode, string(b))
-		if resp.StatusCode == http.StatusNotFound {
-			lapi.metrics.APIRequest(rType, 0, ErrNotExists)
-			return nil, ErrNotExists
-		}
-		err := errors.New(http.StatusText(resp.StatusCode))
-		lapi.metrics.APIRequest(rType, 0, err)
-		return nil, err
-	}
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		glog.Errorf("Error getting stream by id Livepeer API server (%s) error: %v", u, err)
-		lapi.metrics.APIRequest(rType, 0, err)
-		return nil, err
-	}
-	took := time.Since(start)
-	lapi.metrics.APIRequest(rType, took, nil)
-	bs := string(b)
-	glog.V(logs.VERBOSE).Info(bs)
-	if bs == "null" {
+	} else if stream == nil {
 		// API return null if stream does not exists
 		return nil, ErrNotExists
 	}
-	r := &CreateStreamResp{}
-	err = json.Unmarshal(b, r)
-	if err != nil {
+	return stream, nil
+}
+
+func (lapi *Client) GetTask(id string) (*Task, error) {
+	var task Task
+	url := fmt.Sprintf("%s/api/task/%s", lapi.chosenServer, id)
+	if err := lapi.getJSON(url, "task", "", &task); err != nil {
 		return nil, err
 	}
-	return r, nil
+	return &task, nil
+}
+
+func (lapi *Client) UpdateTaskStatus(id string, phase string, progress float64) error {
+	var (
+		url    = fmt.Sprintf("%s/api/task/%s/status", lapi.chosenServer, id)
+		input  = &updateTaskProgressRequest{Status: TaskStatus{phase, progress, 0}}
+		output json.RawMessage
+	)
+	err := lapi.doRequest("POST", url, "task", "update_task_progress", input, &output)
+	if err != nil {
+		return err
+	}
+	glog.V(logs.DEBUG).Infof("Updated task progress id=%s phase=%s progress=%v output=%q", id, phase, progress, string(output))
+	return nil
 }
 
 func (lapi *Client) GetMultistreamTarget(id string) (*MultistreamTarget, error) {
-	rType := "get_multistream_target"
-	start := time.Now()
-	u := fmt.Sprintf("%s/api/multistream/target/%s", lapi.chosenServer, id)
-	req := lapi.getRequest(u)
-	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
-	resp, err := lapi.httpClient.Do(req)
-	if err != nil {
-		glog.Errorf("Error getting MultistreamTarget by id from Livepeer API server (%s) error: %v", u, err)
-		lapi.metrics.APIRequest(rType, 0, err)
+	var target MultistreamTarget
+	url := fmt.Sprintf("%s/api/multistream/target/%s", lapi.chosenServer, id)
+	if err := lapi.getJSON(url, "multistream_target", "", &target); err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		b, _ := ioutil.ReadAll(resp.Body)
-		glog.Errorf("Status error getting MultistreamTarget by id Livepeer API server (%s) status %d body: %s", u, resp.StatusCode, string(b))
-		if resp.StatusCode == http.StatusNotFound {
-			lapi.metrics.APIRequest(rType, 0, ErrNotExists)
-			return nil, ErrNotExists
-		}
-		err := errors.New(http.StatusText(resp.StatusCode))
-		lapi.metrics.APIRequest(rType, 0, err)
-		return nil, err
-	}
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		glog.Errorf("Error getting MultistreamTarget by id Livepeer API server (%s) error: %v", u, err)
-		lapi.metrics.APIRequest(rType, 0, err)
-		return nil, err
-	}
-	took := time.Since(start)
-	lapi.metrics.APIRequest(rType, took, nil)
-	bs := string(b)
-	glog.V(logs.VERBOSE).Info(bs)
-	if bs == "null" {
-		// API return null if stream does not exists
-		return nil, ErrNotExists
-	}
-	r := &MultistreamTarget{}
-	err = json.Unmarshal(b, r)
-	if err != nil {
-		return nil, err
-	}
-	return r, nil
+	return &target, nil
 }
 
 // GetMultistreamTargetR gets multistream target with retries
@@ -832,6 +891,24 @@ func (lapi *Client) GetMultistreamTargetR(id string) (*MultistreamTarget, error)
 	}
 }
 
+func (lapi *Client) GetAsset(id string) (*Asset, error) {
+	var asset Asset
+	url := fmt.Sprintf("%s/api/asset/%s", lapi.chosenServer, id)
+	if err := lapi.getJSON(url, "asset", "", &asset); err != nil {
+		return nil, err
+	}
+	return &asset, nil
+}
+
+func (lapi *Client) GetObjectStore(id string) (*ObjectStore, error) {
+	var os ObjectStore
+	url := fmt.Sprintf("%s/api/object-store/%s", lapi.chosenServer, id)
+	if err := lapi.getJSON(url, "object_store", "", &os); err != nil {
+		return nil, err
+	}
+	return &os, nil
+}
+
 func Timedout(e error) bool {
 	t, ok := e.(interface {
 		Timeout() bool
@@ -839,10 +916,22 @@ func Timedout(e error) bool {
 	return ok && t.Timeout() || (e != nil && strings.Contains(e.Error(), "Client.Timeout"))
 }
 
-func (lapi *Client) newRequest(method, url string, body io.Reader) (*http.Request, error) {
+func (lapi *Client) newRequest(method, url string, bodyObj interface{}) (*http.Request, error) {
+	var body io.Reader
+	if bodyObj != nil {
+		b, err := json.Marshal(bodyObj)
+		if err != nil {
+			return nil, fmt.Errorf("error marshalling body: %w", err)
+		}
+		body = bytes.NewBuffer(b)
+	}
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, err
+	}
+	req.Header.Add("Authorization", "Bearer "+lapi.accessToken)
+	if body != nil {
+		req.Header.Add("Content-Type", "application/json")
 	}
 	if lapi.userAgent != "" {
 		req.Header.Add("User-Agent", lapi.userAgent)
@@ -856,4 +945,158 @@ func (lapi *Client) getRequest(url string) *http.Request {
 		glog.Fatal(err)
 	}
 	return req
+}
+
+func (lapi *Client) getJSON(url, resourceType, metricName string, output interface{}) error {
+	return lapi.doRequest("GET", url, resourceType, metricName, nil, output)
+}
+
+func (lapi *Client) doRequest(method, url, resourceType, metricName string, input, output interface{}) error {
+	if metricName == "" {
+		metricName = strings.ToLower(method + "_" + resourceType)
+	}
+	start := time.Now()
+	req, err := lapi.newRequest(method, url, input)
+	if err != nil {
+		return err
+	}
+
+	resp, err := lapi.httpClient.Do(req)
+	if err != nil {
+		glog.Errorf("Error calling Livepeer API resource=%s method=%s url=%s error=%q", resourceType, method, url, err)
+		lapi.metrics.APIRequest(metricName, 0, err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	if (method == "GET" && resp.StatusCode != http.StatusOK) || (resp.StatusCode >= 300) {
+		b, _ := ioutil.ReadAll(resp.Body)
+		glog.Errorf("Status error from Livepeer API resource=%s method=%s url=%s status=%d body=%q", resourceType, method, url, resp.StatusCode, string(b))
+		if resp.StatusCode == http.StatusNotFound {
+			lapi.metrics.APIRequest(metricName, 0, ErrNotExists)
+			return ErrNotExists
+		}
+		err := errors.New(http.StatusText(resp.StatusCode))
+		lapi.metrics.APIRequest(metricName, 0, err)
+		return err
+	}
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		glog.Errorf("Error reading Livepeer API response body resource=%s method=%s url=%s error=%q", resourceType, method, url, err)
+		lapi.metrics.APIRequest(metricName, 0, err)
+		return err
+	}
+	took := time.Since(start)
+	lapi.metrics.APIRequest(metricName, took, nil)
+
+	return json.Unmarshal(b, output)
+}
+
+func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segData []byte) ([][]byte, error) {
+	var err error
+	if len(lapi.broadcasters) == 0 {
+		lapi.broadcasters, err = lapi.Broadcasters()
+		if err != nil {
+			return nil, err
+		}
+		if len(lapi.broadcasters) == 0 {
+			return nil, fmt.Errorf("no broadcasters available")
+		}
+	}
+	urlToUp := fmt.Sprintf("%s/live/%s/%d.ts", lapi.broadcasters[0], sid, seqNo)
+	var body io.Reader
+	body = bytes.NewReader(segData)
+	req, err := http.NewRequest("POST", urlToUp, body)
+	if err != nil {
+		panic(err)
+	}
+	req.Header.Set("Accept", "multipart/mixed")
+	req.Header.Set("Content-Duration", strconv.FormatInt(dur.Milliseconds(), 10))
+	postStarted := time.Now()
+	resp, err := lapi.httpClient.Do(req)
+	postTook := time.Since(postStarted)
+	var timedout bool
+	var status string
+	if err != nil {
+		uerr := err.(*url.Error)
+		timedout = uerr.Timeout()
+	}
+	if resp != nil {
+		status = resp.Status
+	}
+	glog.V(DEBUG).Infof("Post segment manifest=%s seqNo=%d dur=%s took=%s timed_out=%v status='%v' err=%v",
+		sid, seqNo, dur, postTook, timedout, status, err)
+	if err != nil {
+		return nil, err
+	}
+	glog.V(VERBOSE).Infof("Got transcoded manifest=%s seqNo=%d resp status=%s reading body started", sid, seqNo, resp.Status)
+	if resp.StatusCode != http.StatusOK {
+		b, _ := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+		glog.V(DEBUG).Infof("Got manifest=%s seqNo=%d resp status=%s error in body $%s", sid, seqNo, resp.Status, string(b))
+		return nil, fmt.Errorf("transcode error %s: %s", resp.Status, b)
+	}
+	started := time.Now()
+	mediaType, params, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+	if err != nil {
+		glog.Error("Error getting mime type ", err, sid)
+		panic(err)
+		// return
+	}
+	glog.V(VERBOSE).Infof("mediaType=%s params=%+v", mediaType, params)
+	if glog.V(VVERBOSE) {
+		for k, v := range resp.Header {
+			glog.Infof("Header '%s': '%s'", k, v)
+		}
+	}
+	var segments [][]byte
+	var urls []string
+	if mediaType == "multipart/mixed" {
+		mr := multipart.NewReader(resp.Body, params["boundary"])
+		for {
+			p, merr := mr.NextPart()
+			if merr == io.EOF {
+				break
+			}
+			if merr != nil {
+				glog.Error("Could not process multipart part ", merr, sid)
+				err = merr
+				break
+			}
+			mediaType, _, err := mime.ParseMediaType(p.Header.Get("Content-Type"))
+			if err != nil {
+				glog.Error("Error getting mime type ", err, sid)
+				for k, v := range p.Header {
+					glog.Infof("Header '%s': '%s'", k, v)
+				}
+			}
+			body, merr := ioutil.ReadAll(p)
+			if merr != nil {
+				glog.Errorf("error reading body manifest=%s seqNo=%d err=%v", sid, seqNo, merr)
+				err = merr
+				break
+			}
+			if mediaType == "application/vnd+livepeer.uri" {
+				urls = append(urls, string(body))
+			} else {
+				var v glog.Level = DEBUG
+				if len(body) < 5 {
+					v = 0
+				}
+				glog.V(v).Infof("Read back segment for manifest=%s seqNo=%d profile=%d len=%d bytes", sid, seqNo, len(segments), len(body))
+				segments = append(segments, body)
+			}
+		}
+	}
+	took := time.Since(started)
+	glog.V(VERBOSE).Infof("Reading body back for manifest=%s seqNo=%d took=%s profiles=%d", sid, seqNo, took, len(segments))
+	// glog.Infof("Body: %s", string(tbody))
+
+	if err != nil {
+		httpErr := fmt.Errorf(`error reading http request body for manifest=%s seqNo=%d err=%w`, sid, seqNo, err)
+		glog.Error(httpErr)
+		return nil, err
+	}
+	return segments, nil
 }
