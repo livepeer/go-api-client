@@ -222,11 +222,12 @@ type (
 	}
 
 	AssetSpec struct {
-		Name      string          `json:"name,omitempty"`
-		Type      string          `json:"type"`
-		Size      uint64          `json:"size"`
-		Hash      []AssetHash     `json:"hash"`
-		VideoSpec *AssetVideoSpec `json:"videoSpec,omitempty"`
+		Name                       string          `json:"name,omitempty"`
+		Type                       string          `json:"type"`
+		Size                       uint64          `json:"size"`
+		Hash                       []AssetHash     `json:"hash"`
+		VideoSpec                  *AssetVideoSpec `json:"videoSpec,omitempty"`
+		PlaybackRecordingSessionID string          `json:"playbackRecordingSessionId,omitempty"`
 	}
 
 	AssetHash struct {
