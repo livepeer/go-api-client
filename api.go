@@ -1008,6 +1008,7 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 	var body io.Reader
 	body = bytes.NewReader(segData)
 	req, err := http.NewRequest("POST", urlToUp, body)
+
 	if err != nil {
 		return nil, err
 	}
