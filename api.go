@@ -176,8 +176,20 @@ type (
 		CreatedAt     int64  `json:"createdAt"`
 		InputAssetID  string `json:"inputAssetId,omitempty"`
 		OutputAssetID string `json:"outputAssetId,omitempty"`
-		Type          string `json:"type"`
-		Params        struct {
+		Output        struct {
+			Export struct {
+				IPFS struct {
+					VideoFileCid          string `json:"videoFileCid"`
+					NftMetadataCid        string `json:"nftMetadataCid"`
+					VideoFileUrl          string `json:"videoFileUrl"`
+					VideoFileGatewayUrl   string `json:"videoFileGatewayUrl"`
+					NftMetadataUrl        string `json:"nftMetadataUrl"`
+					NftMetadataGatewayUrl string `json:"nftMetadataGatewayUrl"`
+				} `json:"ipfs"`
+			} `json:"export"`
+		} `json:"output"`
+		Type   string `json:"type"`
+		Params struct {
 			Import    *ImportTaskParams    `json:"import"`
 			Export    *ExportTaskParams    `json:"export"`
 			Transcode *TranscodeTaskParams `json:"transcode"`
@@ -231,6 +243,24 @@ type (
 	CreateTranscodeTaskResp struct {
 		Asset Asset `json:"asset"`
 		Task  Task  `json:"task"`
+	}
+
+	Pinata struct {
+		JWT       string `json:"jwt,omitempty"`
+		APIKey    string `json:"apiKey,omitempty"`
+		APISecret string `json:"apiSecret,omitempty"`
+	}
+
+	IPFS struct {
+		Pinata *Pinata `json:"pinata,omitempty"`
+	}
+
+	createExportTaskRequest struct {
+		IPFS IPFS `json:"ipfs,omitempty"`
+	}
+
+	CreateExportTaskResp struct {
+		Task Task `json:"task"`
 	}
 
 	Asset struct {
@@ -875,7 +905,21 @@ func (lapi *Client) CreateTranscodeTask(assetId string, name string, profile Pro
 	if err != nil {
 		return nil, err
 	}
-	glog.V(logs.DEBUG).Infof("Created transcode task id=%s asset id=%s", output.Task.ID, output.Asset.ID)
+	glog.V(logs.DEBUG).Infof("Created transcode task id=%s assetId=%s status=%s type=%s", output.Task.ID, output.Asset.ID, output.Task.Status.Phase, output.Task.Type)
+	return &output, nil
+}
+
+func (lapi *Client) CreateExportTask(assetId string) (*CreateExportTaskResp, error) {
+	var (
+		url    = fmt.Sprintf("%s/api/asset/%s/export", lapi.chosenServer, assetId)
+		input  = &createExportTaskRequest{IPFS{}}
+		output CreateExportTaskResp
+	)
+	err := lapi.doRequest("POST", url, "export_task", "", input, &output)
+	if err != nil {
+		return nil, err
+	}
+	glog.V(logs.DEBUG).Infof("Created export task id=%s status=%s type=%s", output.Task.ID, output.Task.Status.Phase, output.Task.Type)
 	return &output, nil
 }
 
