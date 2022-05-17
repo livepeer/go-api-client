@@ -222,6 +222,17 @@ type (
 		Status TaskStatus `json:"status"`
 	}
 
+	createTranscodeTaskRequest struct {
+		Name    string  `json:"name,omitempty"`
+		AssetId string  `json:"assetId"`
+		Profile Profile `json:"profile,omitempty"`
+	}
+
+	CreateTranscodeTaskResp struct {
+		Asset Asset `json:"asset"`
+		Task  Task  `json:"task"`
+	}
+
 	Asset struct {
 		ID            string `json:"id"`
 		PlaybackID    string `json:"playbackId"`
@@ -852,6 +863,20 @@ func (lapi *Client) UpdateTaskStatus(id string, phase string, progress float64) 
 	}
 	glog.V(logs.DEBUG).Infof("Updated task progress id=%s phase=%s progress=%v output=%q", id, phase, progress, string(output))
 	return nil
+}
+
+func (lapi *Client) CreateTranscodeTask(assetId string, name string, profile Profile) (*CreateTranscodeTaskResp, error) {
+	var (
+		url    = fmt.Sprintf("%s/api/asset/transcode", lapi.chosenServer)
+		input  = &createTranscodeTaskRequest{AssetId: assetId, Name: name, Profile: profile}
+		output CreateTranscodeTaskResp
+	)
+	err := lapi.doRequest("POST", url, "transcode_task", "", input, &output)
+	if err != nil {
+		return nil, err
+	}
+	glog.V(logs.DEBUG).Infof("Created transcode task id=%s asset id=%s", output.Task.ID, output.Asset.ID)
+	return &output, nil
 }
 
 func (lapi *Client) GetMultistreamTarget(id string) (*MultistreamTarget, error) {
