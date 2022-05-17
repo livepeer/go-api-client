@@ -887,6 +887,15 @@ func (lapi *Client) GetAsset(id string) (*Asset, error) {
 	return &asset, nil
 }
 
+func (lapi *Client) ListAssets() (*[]Asset, error) {
+	var assets []Asset
+	url := fmt.Sprintf("%s/api/asset/", lapi.chosenServer)
+	if err := lapi.getJSON(url, "asset", "", &assets); err != nil {
+		return nil, err
+	}
+	return &assets, nil
+}
+
 func (lapi *Client) GetObjectStore(id string) (*ObjectStore, error) {
 	var os ObjectStore
 	url := fmt.Sprintf("%s/api/object-store/%s", lapi.chosenServer, id)
