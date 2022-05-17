@@ -269,6 +269,7 @@ type (
 		UserID        string `json:"userId"`
 		CreatedAt     int64  `json:"createdAt"`
 		SourceAssetId string `json:"sourceAssetId,omitempty"`
+		Status        string `json:"status,omitempty"`
 		ObjectStoreID string `json:"objectStoreId"`
 		AssetSpec
 	}
