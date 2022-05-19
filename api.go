@@ -1013,7 +1013,10 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 	}
 	req.Header.Set("Accept", "multipart/mixed")
 	req.Header.Set("Content-Duration", strconv.FormatInt(dur.Milliseconds(), 10))
-	req.Header.Set("Content-Resolution", resolution)
+	if resolution != "" {
+		req.Header.Set("Content-Resolution", resolution)
+	}
+
 	postStarted := time.Now()
 	resp, err := lapi.httpClient.Do(req)
 	postTook := time.Since(postStarted)
