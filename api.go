@@ -100,6 +100,14 @@ type (
 		Record   bool      `json:"record,omitempty"`
 	}
 
+	SegmentParameters struct {
+		SeqNo              int
+		Duration           time.Duration
+		Data               []byte
+		Width, Height      int
+		SliceFrom, SliceTo time.Duration
+	}
+
 	// Profile transcoding profile
 	Profile struct {
 		Name    string `json:"name,omitempty"`
@@ -993,7 +1001,7 @@ func (lapi *Client) doRequest(method, url, resourceType, metricName string, inpu
 	return json.Unmarshal(b, output)
 }
 
-func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segData []byte, resolution string, sliceFrom, sliceTo time.Duration) ([][]byte, error) {
+func (lapi *Client) PushSegment(manifestID string, seg SegmentParameters) ([][]byte, error) {
 	var err error
 	if len(lapi.broadcasters) == 0 {
 		lapi.broadcasters, err = lapi.Broadcasters()
@@ -1004,23 +1012,22 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 			return nil, fmt.Errorf("no broadcasters available")
 		}
 	}
-	urlToUp := fmt.Sprintf("%s/live/%s/%d.ts", lapi.broadcasters[0], sid, seqNo)
-	var body io.Reader
-	body = bytes.NewReader(segData)
+	urlToUp := fmt.Sprintf("%s/live/%s/%d.ts", lapi.broadcasters[0], manifestID, seg.SeqNo)
+	body := bytes.NewReader(seg.Data)
 	req, err := http.NewRequest("POST", urlToUp, body)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Accept", "multipart/mixed")
-	req.Header.Set("Content-Duration", strconv.FormatInt(dur.Milliseconds(), 10))
-	if resolution != "" {
-		req.Header.Set("Content-Resolution", resolution)
+	req.Header.Set("Content-Duration", strconv.FormatInt(seg.Duration.Milliseconds(), 10))
+	if seg.Width != 0 && seg.Height != 0 {
+		req.Header.Set("Content-Resolution", fmt.Sprintf("%dx%d", seg.Width, seg.Height))
 	}
-	if sliceFrom != 0 {
-		req.Header.Set("Content-Slice-From", strconv.FormatInt(sliceFrom.Milliseconds(), 10))
+	if seg.SliceFrom != 0 {
+		req.Header.Set("Content-Slice-From", strconv.FormatInt(seg.SliceFrom.Milliseconds(), 10))
 	}
-	if sliceTo != 0 {
-		req.Header.Set("Content-Slice-To", strconv.FormatInt(sliceTo.Milliseconds(), 10))
+	if seg.SliceTo != 0 {
+		req.Header.Set("Content-Slice-To", strconv.FormatInt(seg.SliceTo.Milliseconds(), 10))
 	}
 
 	postStarted := time.Now()
@@ -1036,21 +1043,21 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 		status = resp.Status
 	}
 	glog.V(DEBUG).Infof("Post segment manifest=%s seqNo=%d dur=%s took=%s timed_out=%v status='%v' err=%v",
-		sid, seqNo, dur, postTook, timedout, status, err)
+		manifestID, seg.SeqNo, seg.Duration, postTook, timedout, status, err)
 	if err != nil {
 		return nil, err
 	}
-	glog.V(VERBOSE).Infof("Got transcoded manifest=%s seqNo=%d resp status=%s reading body started", sid, seqNo, resp.Status)
+	glog.V(VERBOSE).Infof("Got transcoded manifest=%s seqNo=%d resp status=%s reading body started", manifestID, seg.SeqNo, resp.Status)
 	if resp.StatusCode != http.StatusOK {
 		b, _ := ioutil.ReadAll(resp.Body)
 		resp.Body.Close()
-		glog.V(DEBUG).Infof("Got manifest=%s seqNo=%d resp status=%s error in body $%s", sid, seqNo, resp.Status, string(b))
+		glog.V(DEBUG).Infof("Got manifest=%s seqNo=%d resp status=%s error in body $%s", manifestID, seg.SeqNo, resp.Status, string(b))
 		return nil, fmt.Errorf("transcode error %s: %s", resp.Status, b)
 	}
 	started := time.Now()
 	mediaType, params, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 	if err != nil {
-		err = fmt.Errorf("error getting mime type manifestID=%s err=%w", sid, err)
+		err = fmt.Errorf("error getting mime type manifestID=%s err=%w", manifestID, err)
 		glog.Error(err)
 		return nil, err
 	}
@@ -1070,20 +1077,20 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 				break
 			}
 			if merr != nil {
-				glog.Error("Could not process multipart part ", merr, sid)
+				glog.Error("Could not process multipart part ", merr, manifestID)
 				err = merr
 				break
 			}
 			mediaType, _, err := mime.ParseMediaType(p.Header.Get("Content-Type"))
 			if err != nil {
-				glog.Error("Error getting mime type ", err, sid)
+				glog.Error("Error getting mime type ", err, manifestID)
 				for k, v := range p.Header {
 					glog.Infof("Header '%s': '%s'", k, v)
 				}
 			}
 			body, merr := ioutil.ReadAll(p)
 			if merr != nil {
-				glog.Errorf("error reading body manifest=%s seqNo=%d err=%v", sid, seqNo, merr)
+				glog.Errorf("error reading body manifest=%s seqNo=%d err=%v", manifestID, seg.SeqNo, merr)
 				err = merr
 				break
 			}
@@ -1094,17 +1101,17 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 				if len(body) < 5 {
 					v = 0
 				}
-				glog.V(v).Infof("Read back segment for manifest=%s seqNo=%d profile=%d len=%d bytes", sid, seqNo, len(segments), len(body))
+				glog.V(v).Infof("Read back segment for manifest=%s seqNo=%d profile=%d len=%d bytes", manifestID, seg.SeqNo, len(segments), len(body))
 				segments = append(segments, body)
 			}
 		}
 	}
 	took := time.Since(started)
-	glog.V(VERBOSE).Infof("Reading body back for manifest=%s seqNo=%d took=%s profiles=%d", sid, seqNo, took, len(segments))
+	glog.V(VERBOSE).Infof("Reading body back for manifest=%s seqNo=%d took=%s profiles=%d", manifestID, seg.SeqNo, took, len(segments))
 	// glog.Infof("Body: %s", string(tbody))
 
 	if err != nil {
-		httpErr := fmt.Errorf(`error reading http request body for manifest=%s seqNo=%d err=%w`, sid, seqNo, err)
+		httpErr := fmt.Errorf(`error reading http request body for manifest=%s seqNo=%d err=%w`, manifestID, seg.SeqNo, err)
 		glog.Error(httpErr)
 		return nil, err
 	}
