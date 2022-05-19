@@ -993,7 +993,7 @@ func (lapi *Client) doRequest(method, url, resourceType, metricName string, inpu
 	return json.Unmarshal(b, output)
 }
 
-func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segData []byte) ([][]byte, error) {
+func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segData []byte, resolution string) ([][]byte, error) {
 	var err error
 	if len(lapi.broadcasters) == 0 {
 		lapi.broadcasters, err = lapi.Broadcasters()
@@ -1013,6 +1013,10 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 	}
 	req.Header.Set("Accept", "multipart/mixed")
 	req.Header.Set("Content-Duration", strconv.FormatInt(dur.Milliseconds(), 10))
+	if resolution != "" {
+		req.Header.Set("Content-Resolution", resolution)
+	}
+
 	postStarted := time.Now()
 	resp, err := lapi.httpClient.Do(req)
 	postTook := time.Since(postStarted)
