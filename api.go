@@ -52,6 +52,13 @@ const (
 	RecordingStatusReady   = "ready"
 )
 
+type NFTMetadataTemplate string
+
+const (
+	NFTMetadataTemplatePlayer NFTMetadataTemplate = "player" // default
+	NFTMetadataTemplateFile   NFTMetadataTemplate = "file"
+)
+
 type (
 	// Object with all options given to Livepeer API
 	ClientOptions struct {
@@ -199,7 +206,8 @@ type (
 				APIKey    string `json:"apiKey,omitempty"`
 				APISecret string `json:"apiSecret,omitempty"`
 			} `json:"pinata,omitempty"`
-			NFTMetadata map[string]interface{} `json:"nftMetadata,omitempty"`
+			NFTMetadataTemplate `json:"nftMetadataTemplate,omitempty"`
+			NFTMetadata         map[string]interface{} `json:"nftMetadata,omitempty"`
 		} `json:"ipfs,omitempty"`
 	}
 
