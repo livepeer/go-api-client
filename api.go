@@ -176,9 +176,15 @@ type (
 		CreatedAt     int64  `json:"createdAt"`
 		InputAssetID  string `json:"inputAssetId,omitempty"`
 		OutputAssetID string `json:"outputAssetId,omitempty"`
-		Output        struct {
-			Export struct {
-				IPFS struct {
+		Type          string `json:"type"`
+		Params        struct {
+			Import    *ImportTaskParams    `json:"import"`
+			Export    *ExportTaskParams    `json:"export"`
+			Transcode *TranscodeTaskParams `json:"transcode"`
+		} `json:"params"`
+		Output *struct {
+			Export *struct {
+				IPFS *struct {
 					VideoFileCid          string `json:"videoFileCid"`
 					NftMetadataCid        string `json:"nftMetadataCid"`
 					VideoFileUrl          string `json:"videoFileUrl"`
@@ -188,12 +194,6 @@ type (
 				} `json:"ipfs"`
 			} `json:"export"`
 		} `json:"output"`
-		Type   string `json:"type"`
-		Params struct {
-			Import    *ImportTaskParams    `json:"import"`
-			Export    *ExportTaskParams    `json:"export"`
-			Transcode *TranscodeTaskParams `json:"transcode"`
-		} `json:"params"`
 		Status TaskStatus `json:"status"`
 	}
 
@@ -234,13 +234,13 @@ type (
 		Status TaskStatus `json:"status"`
 	}
 
-	createTranscodeTaskRequest struct {
+	transcodeAssetRequest struct {
 		Name    string  `json:"name,omitempty"`
 		AssetId string  `json:"assetId"`
 		Profile Profile `json:"profile,omitempty"`
 	}
 
-	CreateTranscodeTaskResp struct {
+	TranscodeAssetResp struct {
 		Asset Asset `json:"asset"`
 		Task  Task  `json:"task"`
 	}
@@ -255,11 +255,11 @@ type (
 		Pinata *Pinata `json:"pinata,omitempty"`
 	}
 
-	createExportTaskRequest struct {
-		IPFS IPFS `json:"ipfs,omitempty"`
+	exportAssetRequest struct {
+		IPFS *IPFS `json:"ipfs"`
 	}
 
-	CreateExportTaskResp struct {
+	ExportAssetResp struct {
 		Task Task `json:"task"`
 	}
 
@@ -896,11 +896,11 @@ func (lapi *Client) UpdateTaskStatus(id string, phase string, progress float64) 
 	return nil
 }
 
-func (lapi *Client) CreateTranscodeTask(assetId string, name string, profile Profile) (*CreateTranscodeTaskResp, error) {
+func (lapi *Client) TranscodeAsset(assetId string, name string, profile Profile) (*TranscodeAssetResp, error) {
 	var (
 		url    = fmt.Sprintf("%s/api/asset/transcode", lapi.chosenServer)
-		input  = &createTranscodeTaskRequest{AssetId: assetId, Name: name, Profile: profile}
-		output CreateTranscodeTaskResp
+		input  = &transcodeAssetRequest{AssetId: assetId, Name: name, Profile: profile}
+		output TranscodeAssetResp
 	)
 	err := lapi.doRequest("POST", url, "transcode_task", "", input, &output)
 	if err != nil {
@@ -910,11 +910,11 @@ func (lapi *Client) CreateTranscodeTask(assetId string, name string, profile Pro
 	return &output, nil
 }
 
-func (lapi *Client) CreateExportTask(assetId string) (*CreateExportTaskResp, error) {
+func (lapi *Client) ExportAsset(assetId string) (*ExportAssetResp, error) {
 	var (
 		url    = fmt.Sprintf("%s/api/asset/%s/export", lapi.chosenServer, assetId)
-		input  = &createExportTaskRequest{IPFS{}}
-		output CreateExportTaskResp
+		input  = &exportAssetRequest{}
+		output ExportAssetResp
 	)
 	err := lapi.doRequest("POST", url, "export_task", "", input, &output)
 	if err != nil {
