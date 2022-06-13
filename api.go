@@ -1026,7 +1026,7 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 			return nil, fmt.Errorf("no broadcasters available")
 		}
 	}
-	timeout := 2*time.Second + 4*dur
+	timeout := 3*time.Second + 3*dur
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	urlToUp := fmt.Sprintf("%s/live/%s/%d.ts", lapi.broadcasters[0], sid, seqNo)
