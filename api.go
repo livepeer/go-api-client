@@ -1,5 +1,5 @@
 // Package livepeer API
-package livepeerAPI
+package lp_api
 
 import (
 	"bytes"
