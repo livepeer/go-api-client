@@ -896,7 +896,7 @@ func (lapi *Client) UpdateTaskStatus(id string, phase string, progress float64) 
 	return nil
 }
 
-func (lapi *Client) TranscodeAsset(assetId string, name string, profile Profile) (*TranscodeAssetResp, error) {
+func (lapi *Client) TranscodeAsset(assetId string, name string, profile Profile) (*Asset, *Task, error) {
 	var (
 		url    = fmt.Sprintf("%s/api/asset/transcode", lapi.chosenServer)
 		input  = &transcodeAssetRequest{AssetId: assetId, Name: name, Profile: profile}
@@ -904,13 +904,13 @@ func (lapi *Client) TranscodeAsset(assetId string, name string, profile Profile)
 	)
 	err := lapi.doRequest("POST", url, "transcode_task", "", input, &output)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	glog.V(logs.DEBUG).Infof("Created transcode task id=%s assetId=%s status=%s type=%s", output.Task.ID, output.Asset.ID, output.Task.Status.Phase, output.Task.Type)
-	return &output, nil
+	return &output.Asset, &output.Task, nil
 }
 
-func (lapi *Client) ExportAsset(assetId string) (*ExportAssetResp, error) {
+func (lapi *Client) ExportAsset(assetId string) (*Task, error) {
 	var (
 		url    = fmt.Sprintf("%s/api/asset/%s/export", lapi.chosenServer, assetId)
 		input  = &exportAssetRequest{}
@@ -921,7 +921,7 @@ func (lapi *Client) ExportAsset(assetId string) (*ExportAssetResp, error) {
 		return nil, err
 	}
 	glog.V(logs.DEBUG).Infof("Created export task id=%s status=%s type=%s", output.Task.ID, output.Task.Status.Phase, output.Task.Type)
-	return &output, nil
+	return &output.Task, nil
 }
 
 func (lapi *Client) GetMultistreamTarget(id string) (*MultistreamTarget, error) {
