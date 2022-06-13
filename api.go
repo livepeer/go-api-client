@@ -90,9 +90,10 @@ type (
 		} `json:"servers,omitempty"`
 	}
 
-	createStreamReq struct {
-		Name    string   `json:"name,omitempty"`
-		Presets []string `json:"presets,omitempty"`
+	CreateStreamReq struct {
+		Name     string   `json:"name,omitempty"`
+		ParentID string   `json:"parentId,omitempty"`
+		Presets  []string `json:"presets,omitempty"`
 		// one of
 		// - P720p60fps16x9
 		// - P720p30fps16x9
@@ -103,8 +104,9 @@ type (
 		// - P240p30fps16x9
 		// - P240p30fps4x3
 		// - P144p30fps16x9
-		Profiles []Profile `json:"profiles,omitempty"`
-		Record   bool      `json:"record,omitempty"`
+		Profiles            []Profile `json:"profiles,omitempty"`
+		Record              bool      `json:"record,omitempty"`
+		RecordObjectStoreId string    `json:"recordObjectStoreId,omitempty"`
 	}
 
 	// Profile transcoding profile
@@ -492,15 +494,6 @@ var StandardProfiles = []Profile{
 	},
 }
 
-// CreateStream creates stream with specified name and profiles
-func (lapi *Client) CreateStream(name string, presets ...string) (string, error) {
-	csr, err := lapi.CreateStreamEx(name, false, presets)
-	if err != nil {
-		return "", err
-	}
-	return csr.ID, err
-}
-
 // DeleteStream deletes stream
 func (lapi *Client) DeleteStream(id string) error {
 	glog.V(logs.DEBUG).Infof("Deleting Livepeer stream '%s' ", id)
@@ -528,32 +521,29 @@ func (lapi *Client) DeleteStream(id string) error {
 
 // CreateStreamEx creates stream with specified name and profiles
 func (lapi *Client) CreateStreamEx(name string, record bool, presets []string, profiles ...Profile) (*CreateStreamResp, error) {
-	return lapi.CreateStreamEx2(name, record, "", presets, profiles...)
+	return lapi.CreateStream(CreateStreamReq{Name: name, Record: record, Presets: presets, Profiles: profiles})
 }
 
-// CreateStreamEx creates stream with specified name and profiles
-func (lapi *Client) CreateStreamEx2(name string, record bool, parentID string, presets []string, profiles ...Profile) (*CreateStreamResp, error) {
-	// presets := profiles
-	// if len(presets) == 0 {
-	// 	presets = lapi.presets
-	// }
-	glog.Infof("Creating Livepeer stream '%s' with presets '%v' and profiles %+v", name, presets, profiles)
-	reqs := &createStreamReq{
-		Name:    name,
-		Presets: presets,
-		Record:  record,
+// CreateStream creates stream with specified name and profiles
+func (lapi *Client) CreateStream(csr CreateStreamReq) (*CreateStreamResp, error) {
+	if csr.Name == "" {
+		return nil, errors.New("stream must have a name")
 	}
-	if len(presets) == 0 {
-		reqs.Profiles = StandardProfiles
+	if len(csr.Presets) == 0 && len(csr.Profiles) == 0 {
+		csr.Profiles = StandardProfiles
 	}
-	if len(profiles) > 0 {
-		reqs.Profiles = profiles
+	glog.Infof("Creating Livepeer stream '%s' with presets '%v' and profiles %+v", csr.Name, csr.Presets, csr.Profiles)
+	b, err := json.Marshal(csr)
+	if err != nil {
+		glog.V(logs.SHORT).Infof("Error marshalling create stream request %v", err)
+		return nil, err
 	}
+	glog.Infof("Sending: %s", b)
 	u := fmt.Sprintf("%s/api/stream", lapi.chosenServer)
-	if parentID != "" {
-		u = fmt.Sprintf("%s/api/stream/%s/stream", lapi.chosenServer, parentID)
+	if csr.ParentID != "" {
+		u = fmt.Sprintf("%s/api/stream/%s/stream", lapi.chosenServer, csr.ParentID)
 	}
-	req, err := lapi.newRequest("POST", u, reqs)
+	req, err := lapi.newRequest("POST", u, bytes.NewBuffer(b))
 	if err != nil {
 		return nil, err
 	}
@@ -563,7 +553,7 @@ func (lapi *Client) CreateStreamEx2(name string, record bool, parentID string, p
 		return nil, err
 	}
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
 		glog.Errorf("Error creating Livepeer stream (body) %v", err)
 		return nil, err
@@ -575,9 +565,9 @@ func (lapi *Client) CreateStreamEx2(name string, record bool, parentID string, p
 		return nil, err
 	}
 	if len(r.Errors) > 0 {
-		return nil, fmt.Errorf("error creating stream: %+v", r.Errors)
+		return nil, fmt.Errorf("Error creating stream: %+v", r.Errors)
 	}
-	glog.Infof("Stream %s created with id %s", name, r.ID)
+	glog.Infof("Stream %s created with id %s", csr.Name, r.ID)
 	return r, nil
 }
 
