@@ -264,14 +264,19 @@ type (
 	}
 
 	Asset struct {
-		ID            string `json:"id"`
-		PlaybackID    string `json:"playbackId"`
-		UserID        string `json:"userId"`
-		CreatedAt     int64  `json:"createdAt"`
-		SourceAssetId string `json:"sourceAssetId,omitempty"`
-		Status        string `json:"status,omitempty"`
-		ObjectStoreID string `json:"objectStoreId"`
+		ID            string      `json:"id"`
+		PlaybackID    string      `json:"playbackId"`
+		UserID        string      `json:"userId"`
+		CreatedAt     int64       `json:"createdAt"`
+		SourceAssetId string      `json:"sourceAssetId,omitempty"`
+		Status        AssetStatus `json:"status"`
+		ObjectStoreID string      `json:"objectStoreId"`
 		AssetSpec
+	}
+
+	AssetStatus struct {
+		Phase     string `json:"phase"`
+		UpdatedAt int64  `json:"updatedAt,omitempty"`
 	}
 
 	AssetSpec struct {
@@ -913,7 +918,7 @@ func (lapi *Client) TranscodeAsset(assetId string, name string, profile Profile)
 func (lapi *Client) ExportAsset(assetId string) (*Task, error) {
 	var (
 		url    = fmt.Sprintf("%s/api/asset/%s/export", lapi.chosenServer, assetId)
-		input  = &exportAssetRequest{}
+		input  = &exportAssetRequest{IPFS: &IPFS{}}
 		output ExportAssetResp
 	)
 	err := lapi.doRequest("POST", url, "export_task", "", input, &output)
