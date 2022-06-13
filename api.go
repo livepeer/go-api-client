@@ -551,12 +551,8 @@ func (lapi *Client) CreateStream(csr CreateStreamReq) (*Stream, error) {
 	}
 	defer httpResp.Body.Close()
 
-	if !isSuccessStatus(httpResp.StatusCode) {
-		var errs errorResp
-		if err = json.NewDecoder(httpResp.Body).Decode(&errs); err != nil {
-			return nil, fmt.Errorf("request failed (%s) and parsing response errored: %w", httpResp.Status, err)
-		}
-		return nil, fmt.Errorf("error creating stream: %+v", errs.Errors)
+	if err := checkResponseError(httpResp); err != nil {
+		return nil, fmt.Errorf("error creating stream: %w", err)
 	}
 	var stream *Stream
 	if err = json.NewDecoder(httpResp.Body).Decode(&stream); err != nil {
@@ -962,14 +958,7 @@ func (lapi *Client) doRequest(method, url, resourceType, metricName string, inpu
 	}
 	defer resp.Body.Close()
 
-	if (method == "GET" && resp.StatusCode != http.StatusOK) || !isSuccessStatus(resp.StatusCode) {
-		b, _ := ioutil.ReadAll(resp.Body)
-		glog.Errorf("Status error from Livepeer API resource=%s method=%s url=%s status=%d body=%q", resourceType, method, url, resp.StatusCode, string(b))
-		if resp.StatusCode == http.StatusNotFound {
-			lapi.metrics.APIRequest(metricName, 0, ErrNotExists)
-			return ErrNotExists
-		}
-		err := errors.New(http.StatusText(resp.StatusCode))
+	if err := checkResponseError(resp); err != nil {
 		lapi.metrics.APIRequest(metricName, 0, err)
 		return err
 	}
@@ -1021,6 +1010,7 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 	}
 	if resp != nil {
 		status = resp.Status
+		defer resp.Body.Close()
 	}
 	glog.V(DEBUG).Infof("Post segment manifest=%s seqNo=%d dur=%s took=%s timed_out=%v status='%v' err=%v",
 		sid, seqNo, dur, postTook, timedout, status, err)
@@ -1028,11 +1018,9 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 		return nil, err
 	}
 	glog.V(VERBOSE).Infof("Got transcoded manifest=%s seqNo=%d resp status=%s reading body started", sid, seqNo, resp.Status)
-	if resp.StatusCode != http.StatusOK {
-		b, _ := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		glog.V(DEBUG).Infof("Got manifest=%s seqNo=%d resp status=%s error in body $%s", sid, seqNo, resp.Status, string(b))
-		return nil, fmt.Errorf("transcode error %s: %s", resp.Status, b)
+	if err := checkResponseError(resp); err != nil {
+		glog.V(DEBUG).Infof("Got manifest=%s seqNo=%d resp status=%s error=%+v", sid, seqNo, resp.Status, err)
+		return nil, fmt.Errorf("transcode error: %w", err)
 	}
 	started := time.Now()
 	mediaType, params, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
@@ -1096,6 +1084,25 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 		return nil, err
 	}
 	return segments, nil
+}
+
+func checkResponseError(resp *http.Response) error {
+	if isSuccessStatus(resp.StatusCode) {
+		return nil
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	glog.Errorf("Status error from Livepeer API method=%s url=%s status=%d body=%q", resp.Request.Method, resp.Request.URL, resp.StatusCode, string(body))
+	if err != nil {
+		return fmt.Errorf("failed reading error response (%s): %w", resp.Status, err)
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return ErrNotExists
+	}
+	var errs errorResp
+	if err := json.Unmarshal(body, &errs); err != nil {
+		return fmt.Errorf("failed parsing error response (%s): %w", resp.Status, err)
+	}
+	return fmt.Errorf("error response (%s) from api: %v", resp.Status, errs.Errors)
 }
 
 func isSuccessStatus(status int) bool {
