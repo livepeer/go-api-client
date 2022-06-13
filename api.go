@@ -551,7 +551,7 @@ func (lapi *Client) CreateStream(csr CreateStreamReq) (*Stream, error) {
 	}
 	defer httpResp.Body.Close()
 
-	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
+	if !isSuccessStatus(httpResp.StatusCode) {
 		var errs errorResp
 		if err = json.NewDecoder(httpResp.Body).Decode(&errs); err != nil {
 			return nil, fmt.Errorf("request failed (%s) and parsing response errored: %w", httpResp.Status, err)
@@ -778,7 +778,7 @@ func (lapi *Client) SetActive(id string, active bool, startedAt time.Time) (bool
 	lapi.metrics.APIRequest("set_active", took, nil)
 	glog.Infof("%s/setactive took=%s response status code %d status %s resp %+v body=%s",
 		id, took, resp.StatusCode, resp.Status, resp, string(b))
-	return resp.StatusCode >= 200 && resp.StatusCode < 300, nil
+	return isSuccessStatus(resp.StatusCode), nil
 }
 
 // DeactivateMany sets many streams isActive field to false
@@ -813,7 +813,7 @@ func (lapi *Client) DeactivateMany(ids []string) (int, error) {
 	lapi.metrics.APIRequest("deactivate-many", took, nil)
 	glog.Infof("deactivate-many took=%s response status code %d status %s resp %+v body=%s",
 		took, resp.StatusCode, resp.Status, resp, string(b))
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+	if !isSuccessStatus(resp.StatusCode) {
 		return 0, fmt.Errorf("invalid status code: %d", resp.StatusCode)
 	}
 
@@ -962,7 +962,7 @@ func (lapi *Client) doRequest(method, url, resourceType, metricName string, inpu
 	}
 	defer resp.Body.Close()
 
-	if (method == "GET" && resp.StatusCode != http.StatusOK) || (resp.StatusCode >= 300) {
+	if (method == "GET" && resp.StatusCode != http.StatusOK) || !isSuccessStatus(resp.StatusCode) {
 		b, _ := ioutil.ReadAll(resp.Body)
 		glog.Errorf("Status error from Livepeer API resource=%s method=%s url=%s status=%d body=%q", resourceType, method, url, resp.StatusCode, string(b))
 		if resp.StatusCode == http.StatusNotFound {
@@ -1096,4 +1096,8 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 		return nil, err
 	}
 	return segments, nil
+}
+
+func isSuccessStatus(status int) bool {
+	return status >= 200 && status < 300
 }
