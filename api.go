@@ -12,7 +12,6 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -1044,17 +1043,12 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 	postStarted := time.Now()
 	resp, err := pushSegmentHTTPClient.Do(req)
 	postTook := time.Since(postStarted)
-	var timedout bool
 	var status string
-	if err != nil {
-		uerr := err.(*url.Error)
-		timedout = uerr.Timeout()
-	}
 	if resp != nil {
 		status = resp.Status
 	}
 	glog.V(DEBUG).Infof("Post segment manifest=%s seqNo=%d dur=%s took=%s timed_out=%v status='%v' err=%v",
-		sid, seqNo, dur, postTook, timedout, status, err)
+		sid, seqNo, dur, postTook, Timedout(err), status, err)
 	if err != nil {
 		return nil, err
 	}
