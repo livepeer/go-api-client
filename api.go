@@ -109,6 +109,10 @@ type (
 		RecordObjectStoreId string    `json:"recordObjectStoreId,omitempty"`
 	}
 
+	errorResp struct {
+		Errors []string `json:"errors"`
+	}
+
 	// Profile transcoding profile
 	Profile struct {
 		Name    string `json:"name,omitempty"`
@@ -546,18 +550,20 @@ func (lapi *Client) CreateStream(csr CreateStreamReq) (*Stream, error) {
 		return nil, err
 	}
 	defer httpResp.Body.Close()
-	var resp struct {
-		*Stream
-		Errors []string `json:"errors,omitempty"`
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
+		var errs errorResp
+		if err = json.NewDecoder(httpResp.Body).Decode(&errs); err != nil {
+			return nil, fmt.Errorf("request failed (%s) and parsing response errored: %w", httpResp.Status, err)
+		}
+		return nil, fmt.Errorf("error creating stream: %+v", errs.Errors)
 	}
-	if err = json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
-		glog.Errorf("Error parsing create stream response err=%+v", err)
-		return nil, err
-	} else if len(resp.Errors) > 0 || resp.Stream == nil {
-		return nil, fmt.Errorf("error creating stream: %+v", resp.Errors)
+	var stream *Stream
+	if err = json.NewDecoder(httpResp.Body).Decode(&stream); err != nil {
+		return nil, fmt.Errorf("error parsing create stream response: %w", err)
 	}
-	glog.Infof("Created stream name=%q id=%s", csr.Name, resp.ID)
-	return resp.Stream, nil
+	glog.Infof("Created stream name=%q id=%s", csr.Name, stream.ID)
+	return stream, nil
 }
 
 // DefaultPresets returns default presets
