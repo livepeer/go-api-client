@@ -109,10 +109,6 @@ type (
 		RecordObjectStoreId string    `json:"recordObjectStoreId,omitempty"`
 	}
 
-	errorResp struct {
-		Errors []string `json:"errors"`
-	}
-
 	// Profile transcoding profile
 	Profile struct {
 		Name    string `json:"name,omitempty"`
@@ -1098,11 +1094,13 @@ func checkResponseError(resp *http.Response) error {
 	if resp.StatusCode == http.StatusNotFound {
 		return ErrNotExists
 	}
-	var errs errorResp
-	if err := json.Unmarshal(body, &errs); err != nil {
-		return fmt.Errorf("failed parsing error response (%s): %w", resp.Status, err)
+	var errResp struct {
+		Errors []string `json:"errors"`
 	}
-	return fmt.Errorf("error response (%s) from api: %v", resp.Status, errs.Errors)
+	if err := json.Unmarshal(body, &errResp); err != nil {
+		return fmt.Errorf("request failed (%s) and failed parsing error response (%s): %w", resp.Status, body, err)
+	}
+	return fmt.Errorf("error response (%s) from api: %v", resp.Status, errResp.Errors)
 }
 
 func isSuccessStatus(status int) bool {
