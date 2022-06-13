@@ -532,43 +532,30 @@ func (lapi *Client) CreateStream(csr CreateStreamReq) (*CreateStreamResp, error)
 	if len(csr.Presets) == 0 && len(csr.Profiles) == 0 {
 		csr.Profiles = StandardProfiles
 	}
-	glog.Infof("Creating Livepeer stream '%s' with presets '%v' and profiles %+v", csr.Name, csr.Presets, csr.Profiles)
-	b, err := json.Marshal(csr)
-	if err != nil {
-		glog.V(logs.SHORT).Infof("Error marshalling create stream request %v", err)
-		return nil, err
-	}
-	glog.Infof("Sending: %s", b)
+	glog.V(logs.DEBUG).Infof(`Creating Livepeer stream name=%q presets="%v" profiles="%+v"`, csr.Name, csr.Presets, csr.Profiles)
 	u := fmt.Sprintf("%s/api/stream", lapi.chosenServer)
 	if csr.ParentID != "" {
 		u = fmt.Sprintf("%s/api/stream/%s/stream", lapi.chosenServer, csr.ParentID)
 	}
-	req, err := lapi.newRequest("POST", u, bytes.NewBuffer(b))
+	req, err := lapi.newRequest("POST", u, csr)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := lapi.httpClient.Do(req)
+	httpResp, err := lapi.httpClient.Do(req)
 	if err != nil {
-		glog.Errorf("Error creating Livepeer stream %v", err)
+		glog.Errorf("Error creating stream err=%+v", err)
 		return nil, err
 	}
-	defer resp.Body.Close()
-	b, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		glog.Errorf("Error creating Livepeer stream (body) %v", err)
+	defer httpResp.Body.Close()
+	var resp CreateStreamResp
+	if err = json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
+		glog.Errorf("Error parsing create stream response err=%+v", err)
 		return nil, err
+	} else if len(resp.Errors) > 0 {
+		return nil, fmt.Errorf("error creating stream: %+v", resp.Errors)
 	}
-	glog.Info(string(b))
-	r := &CreateStreamResp{}
-	err = json.Unmarshal(b, r)
-	if err != nil {
-		return nil, err
-	}
-	if len(r.Errors) > 0 {
-		return nil, fmt.Errorf("Error creating stream: %+v", r.Errors)
-	}
-	glog.Infof("Stream %s created with id %s", csr.Name, r.ID)
-	return r, nil
+	glog.Infof("Created stream name=%q id=%s", csr.Name, resp.ID)
+	return &resp, nil
 }
 
 // DefaultPresets returns default presets
