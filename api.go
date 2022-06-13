@@ -128,8 +128,8 @@ type (
 		ID        string `json:"id,omitempty"`
 	}
 
-	// CreateStreamResp returned by API
-	CreateStreamResp struct {
+	// Stream object as returned by the API
+	Stream struct {
 		ID                         string    `json:"id,omitempty"`
 		Name                       string    `json:"name,omitempty"`
 		Presets                    []string  `json:"presets,omitempty"`
@@ -147,7 +147,6 @@ type (
 		Deleted                    bool      `json:"deleted,omitempty"`
 		Record                     bool      `json:"record"`
 		Profiles                   []Profile `json:"profiles,omitempty"`
-		Errors                     []string  `json:"errors,omitempty"`
 		Multistream                struct {
 			Targets []MultistreamTargetRef `json:"targets,omitempty"`
 		} `json:"multistream"`
@@ -155,7 +154,7 @@ type (
 
 	// UserSession user's sessions
 	UserSession struct {
-		CreateStreamResp
+		Stream
 		RecordingStatus string `json:"recordingStatus,omitempty"` // ready, waiting
 		RecordingURL    string `json:"recordingUrl,omitempty"`
 		Mp4Url          string `json:"mp4Url,omitempty"`
@@ -520,12 +519,12 @@ func (lapi *Client) DeleteStream(id string) error {
 }
 
 // CreateStreamEx creates stream with specified name and profiles
-func (lapi *Client) CreateStreamEx(name string, record bool, presets []string, profiles ...Profile) (*CreateStreamResp, error) {
+func (lapi *Client) CreateStreamEx(name string, record bool, presets []string, profiles ...Profile) (*Stream, error) {
 	return lapi.CreateStream(CreateStreamReq{Name: name, Record: record, Presets: presets, Profiles: profiles})
 }
 
 // CreateStream creates stream with specified name and profiles
-func (lapi *Client) CreateStream(csr CreateStreamReq) (*CreateStreamResp, error) {
+func (lapi *Client) CreateStream(csr CreateStreamReq) (*Stream, error) {
 	if csr.Name == "" {
 		return nil, errors.New("stream must have a name")
 	}
@@ -547,15 +546,18 @@ func (lapi *Client) CreateStream(csr CreateStreamReq) (*CreateStreamResp, error)
 		return nil, err
 	}
 	defer httpResp.Body.Close()
-	var resp CreateStreamResp
+	var resp struct {
+		*Stream
+		Errors []string `json:"errors,omitempty"`
+	}
 	if err = json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
 		glog.Errorf("Error parsing create stream response err=%+v", err)
 		return nil, err
-	} else if len(resp.Errors) > 0 {
+	} else if len(resp.Errors) > 0 || resp.Stream == nil {
 		return nil, fmt.Errorf("error creating stream: %+v", resp.Errors)
 	}
 	glog.Infof("Created stream name=%q id=%s", csr.Name, resp.ID)
-	return &resp, nil
+	return resp.Stream, nil
 }
 
 // DefaultPresets returns default presets
@@ -564,7 +566,7 @@ func (lapi *Client) DefaultPresets() []string {
 }
 
 // GetStreamByKey gets stream by streamKey
-func (lapi *Client) GetStreamByKey(key string) (*CreateStreamResp, error) {
+func (lapi *Client) GetStreamByKey(key string) (*Stream, error) {
 	if key == "" {
 		return nil, errors.New("empty key")
 	}
@@ -573,7 +575,7 @@ func (lapi *Client) GetStreamByKey(key string) (*CreateStreamResp, error) {
 }
 
 // GetStreamByPlaybackID gets stream by playbackID
-func (lapi *Client) GetStreamByPlaybackID(playbackID string) (*CreateStreamResp, error) {
+func (lapi *Client) GetStreamByPlaybackID(playbackID string) (*Stream, error) {
 	if playbackID == "" {
 		return nil, errors.New("empty playbackID")
 	}
@@ -582,7 +584,7 @@ func (lapi *Client) GetStreamByPlaybackID(playbackID string) (*CreateStreamResp,
 }
 
 // GetStream gets stream by id
-func (lapi *Client) GetStream(id string) (*CreateStreamResp, error) {
+func (lapi *Client) GetStream(id string) (*Stream, error) {
 	if id == "" {
 		return nil, errors.New("empty id")
 	}
@@ -818,8 +820,8 @@ func (lapi *Client) DeactivateMany(ids []string) (int, error) {
 	return mr.RowCount, nil
 }
 
-func (lapi *Client) getStream(url, metricName string) (*CreateStreamResp, error) {
-	var stream *CreateStreamResp
+func (lapi *Client) getStream(url, metricName string) (*Stream, error) {
+	var stream *Stream
 	if err := lapi.getJSON(url, "stream", metricName, &stream); err != nil {
 		return nil, err
 	} else if stream == nil {
