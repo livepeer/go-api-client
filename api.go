@@ -919,11 +919,18 @@ func (lapi *Client) GetObjectStore(id string) (*ObjectStore, error) {
 	return &os, nil
 }
 
-func Timedout(e error) bool {
-	t, ok := e.(interface {
+func Timedout(err error) bool {
+	if err == nil {
+		return false
+	}
+	var terr interface {
 		Timeout() bool
-	})
-	return ok && t.Timeout() || (e != nil && strings.Contains(e.Error(), "Client.Timeout"))
+	}
+	if errors.As(err, &terr) && terr.Timeout() {
+		return true
+	}
+	errMsg := strings.ToLower(err.Error())
+	return strings.Contains(errMsg, "client.timeout")
 }
 
 func (lapi *Client) newRequest(method, url string, bodyObj interface{}) (*http.Request, error) {
