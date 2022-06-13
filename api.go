@@ -256,7 +256,7 @@ type (
 	}
 
 	exportAssetRequest struct {
-		IPFS *IPFS `json:"ipfs"`
+		IPFS *IPFS `json:"ipfs,omitempty"`
 	}
 
 	ExportAssetResp struct {
