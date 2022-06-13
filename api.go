@@ -35,11 +35,14 @@ const (
 // ErrNotExists returned if receives a 404 error from the API
 var ErrNotExists = errors.New("not found")
 
-const httpTimeout = 4 * time.Second
 const setActiveTimeout = 1500 * time.Millisecond
 
 var defaultHTTPClient = &http.Client{
-	Timeout: httpTimeout,
+	Timeout: 4 * time.Second,
+}
+
+var pushSegmentHTTPClient = &http.Client{
+	Timeout: 2 * time.Minute,
 }
 
 var hostName, _ = os.Hostname()
@@ -1013,8 +1016,7 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 		}
 	}
 	urlToUp := fmt.Sprintf("%s/live/%s/%d.ts", lapi.broadcasters[0], sid, seqNo)
-	var body io.Reader
-	body = bytes.NewReader(segData)
+	body := bytes.NewReader(segData)
 	req, err := http.NewRequest("POST", urlToUp, body)
 	if err != nil {
 		return nil, err
@@ -1026,7 +1028,7 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 	}
 
 	postStarted := time.Now()
-	resp, err := lapi.httpClient.Do(req)
+	resp, err := pushSegmentHTTPClient.Do(req)
 	postTook := time.Since(postStarted)
 	var timedout bool
 	var status string
