@@ -1113,10 +1113,10 @@ func checkResponseError(resp *http.Response) error {
 	var errResp struct {
 		Errors []string `json:"errors"`
 	}
-	if err := json.Unmarshal(body, &errResp); err != nil {
-		return fmt.Errorf("request failed (%s) and failed parsing error response (%s): %w", resp.Status, body, err)
+	if err := json.Unmarshal(body, &errResp); err != nil || len(errResp.Errors) == 0 {
+		return fmt.Errorf("request failed with status %s and body: %s", resp.Status, body)
 	}
-	return fmt.Errorf("error response (%s) from api: %v", resp.Status, errResp.Errors)
+	return fmt.Errorf("request failed with status %s and errors: %v", resp.Status, errResp.Errors)
 }
 
 func isSuccessStatus(status int) bool {
