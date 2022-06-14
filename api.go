@@ -193,6 +193,7 @@ type (
 
 	ImportTaskParams struct {
 		URL               string `json:"url,omitempty"`
+		RecordedSessionID string `json:"recordedSessionID,omitempty"`
 		UploadedObjectKey string `json:"uploadedObjectKey,omitempty"`
 	}
 
