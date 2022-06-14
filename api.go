@@ -90,9 +90,10 @@ type (
 		} `json:"servers,omitempty"`
 	}
 
-	createStreamReq struct {
-		Name    string   `json:"name,omitempty"`
-		Presets []string `json:"presets,omitempty"`
+	CreateStreamReq struct {
+		Name     string   `json:"name,omitempty"`
+		ParentID string   `json:"parentId,omitempty"`
+		Presets  []string `json:"presets,omitempty"`
 		// one of
 		// - P720p60fps16x9
 		// - P720p30fps16x9
@@ -103,8 +104,9 @@ type (
 		// - P240p30fps16x9
 		// - P240p30fps4x3
 		// - P144p30fps16x9
-		Profiles []Profile `json:"profiles,omitempty"`
-		Record   bool      `json:"record,omitempty"`
+		Profiles            []Profile `json:"profiles,omitempty"`
+		Record              bool      `json:"record,omitempty"`
+		RecordObjectStoreId string    `json:"recordObjectStoreId,omitempty"`
 	}
 
 	// Profile transcoding profile
@@ -126,8 +128,8 @@ type (
 		ID        string `json:"id,omitempty"`
 	}
 
-	// CreateStreamResp returned by API
-	CreateStreamResp struct {
+	// Stream object as returned by the API
+	Stream struct {
 		ID                         string    `json:"id,omitempty"`
 		Name                       string    `json:"name,omitempty"`
 		Presets                    []string  `json:"presets,omitempty"`
@@ -145,7 +147,6 @@ type (
 		Deleted                    bool      `json:"deleted,omitempty"`
 		Record                     bool      `json:"record"`
 		Profiles                   []Profile `json:"profiles,omitempty"`
-		Errors                     []string  `json:"errors,omitempty"`
 		Multistream                struct {
 			Targets []MultistreamTargetRef `json:"targets,omitempty"`
 		} `json:"multistream"`
@@ -153,7 +154,7 @@ type (
 
 	// UserSession user's sessions
 	UserSession struct {
-		CreateStreamResp
+		Stream
 		RecordingStatus string `json:"recordingStatus,omitempty"` // ready, waiting
 		RecordingURL    string `json:"recordingUrl,omitempty"`
 		Mp4Url          string `json:"mp4Url,omitempty"`
@@ -492,15 +493,6 @@ var StandardProfiles = []Profile{
 	},
 }
 
-// CreateStream creates stream with specified name and profiles
-func (lapi *Client) CreateStream(name string, presets ...string) (string, error) {
-	csr, err := lapi.CreateStreamEx(name, false, presets)
-	if err != nil {
-		return "", err
-	}
-	return csr.ID, err
-}
-
 // DeleteStream deletes stream
 func (lapi *Client) DeleteStream(id string) error {
 	glog.V(logs.DEBUG).Infof("Deleting Livepeer stream '%s' ", id)
@@ -527,58 +519,43 @@ func (lapi *Client) DeleteStream(id string) error {
 }
 
 // CreateStreamEx creates stream with specified name and profiles
-func (lapi *Client) CreateStreamEx(name string, record bool, presets []string, profiles ...Profile) (*CreateStreamResp, error) {
-	return lapi.CreateStreamEx2(name, record, "", presets, profiles...)
+func (lapi *Client) CreateStreamEx(name string, record bool, presets []string, profiles ...Profile) (*Stream, error) {
+	return lapi.CreateStream(CreateStreamReq{Name: name, Record: record, Presets: presets, Profiles: profiles})
 }
 
-// CreateStreamEx creates stream with specified name and profiles
-func (lapi *Client) CreateStreamEx2(name string, record bool, parentID string, presets []string, profiles ...Profile) (*CreateStreamResp, error) {
-	// presets := profiles
-	// if len(presets) == 0 {
-	// 	presets = lapi.presets
-	// }
-	glog.Infof("Creating Livepeer stream '%s' with presets '%v' and profiles %+v", name, presets, profiles)
-	reqs := &createStreamReq{
-		Name:    name,
-		Presets: presets,
-		Record:  record,
+// CreateStream creates stream with specified name and profiles
+func (lapi *Client) CreateStream(csr CreateStreamReq) (*Stream, error) {
+	if csr.Name == "" {
+		return nil, errors.New("stream must have a name")
 	}
-	if len(presets) == 0 {
-		reqs.Profiles = StandardProfiles
+	if len(csr.Presets) == 0 && len(csr.Profiles) == 0 {
+		csr.Profiles = StandardProfiles
 	}
-	if len(profiles) > 0 {
-		reqs.Profiles = profiles
-	}
+	glog.V(logs.DEBUG).Infof(`Creating Livepeer stream name=%q presets="%v" profiles="%+v"`, csr.Name, csr.Presets, csr.Profiles)
 	u := fmt.Sprintf("%s/api/stream", lapi.chosenServer)
-	if parentID != "" {
-		u = fmt.Sprintf("%s/api/stream/%s/stream", lapi.chosenServer, parentID)
+	if csr.ParentID != "" {
+		u = fmt.Sprintf("%s/api/stream/%s/stream", lapi.chosenServer, csr.ParentID)
 	}
-	req, err := lapi.newRequest("POST", u, reqs)
+	req, err := lapi.newRequest("POST", u, csr)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := lapi.httpClient.Do(req)
+	httpResp, err := lapi.httpClient.Do(req)
 	if err != nil {
-		glog.Errorf("Error creating Livepeer stream %v", err)
+		glog.Errorf("Error creating stream err=%+v", err)
 		return nil, err
 	}
-	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		glog.Errorf("Error creating Livepeer stream (body) %v", err)
-		return nil, err
+	defer httpResp.Body.Close()
+
+	if err := checkResponseError(httpResp); err != nil {
+		return nil, fmt.Errorf("error creating stream: %w", err)
 	}
-	glog.Info(string(b))
-	r := &CreateStreamResp{}
-	err = json.Unmarshal(b, r)
-	if err != nil {
-		return nil, err
+	var stream *Stream
+	if err = json.NewDecoder(httpResp.Body).Decode(&stream); err != nil {
+		return nil, fmt.Errorf("error parsing create stream response: %w", err)
 	}
-	if len(r.Errors) > 0 {
-		return nil, fmt.Errorf("error creating stream: %+v", r.Errors)
-	}
-	glog.Infof("Stream %s created with id %s", name, r.ID)
-	return r, nil
+	glog.Infof("Created stream name=%q id=%s", csr.Name, stream.ID)
+	return stream, nil
 }
 
 // DefaultPresets returns default presets
@@ -587,7 +564,7 @@ func (lapi *Client) DefaultPresets() []string {
 }
 
 // GetStreamByKey gets stream by streamKey
-func (lapi *Client) GetStreamByKey(key string) (*CreateStreamResp, error) {
+func (lapi *Client) GetStreamByKey(key string) (*Stream, error) {
 	if key == "" {
 		return nil, errors.New("empty key")
 	}
@@ -596,7 +573,7 @@ func (lapi *Client) GetStreamByKey(key string) (*CreateStreamResp, error) {
 }
 
 // GetStreamByPlaybackID gets stream by playbackID
-func (lapi *Client) GetStreamByPlaybackID(playbackID string) (*CreateStreamResp, error) {
+func (lapi *Client) GetStreamByPlaybackID(playbackID string) (*Stream, error) {
 	if playbackID == "" {
 		return nil, errors.New("empty playbackID")
 	}
@@ -605,7 +582,7 @@ func (lapi *Client) GetStreamByPlaybackID(playbackID string) (*CreateStreamResp,
 }
 
 // GetStream gets stream by id
-func (lapi *Client) GetStream(id string) (*CreateStreamResp, error) {
+func (lapi *Client) GetStream(id string) (*Stream, error) {
 	if id == "" {
 		return nil, errors.New("empty id")
 	}
@@ -793,7 +770,7 @@ func (lapi *Client) SetActive(id string, active bool, startedAt time.Time) (bool
 	lapi.metrics.APIRequest("set_active", took, nil)
 	glog.Infof("%s/setactive took=%s response status code %d status %s resp %+v body=%s",
 		id, took, resp.StatusCode, resp.Status, resp, string(b))
-	return resp.StatusCode >= 200 && resp.StatusCode < 300, nil
+	return isSuccessStatus(resp.StatusCode), nil
 }
 
 // DeactivateMany sets many streams isActive field to false
@@ -828,7 +805,7 @@ func (lapi *Client) DeactivateMany(ids []string) (int, error) {
 	lapi.metrics.APIRequest("deactivate-many", took, nil)
 	glog.Infof("deactivate-many took=%s response status code %d status %s resp %+v body=%s",
 		took, resp.StatusCode, resp.Status, resp, string(b))
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+	if !isSuccessStatus(resp.StatusCode) {
 		return 0, fmt.Errorf("invalid status code: %d", resp.StatusCode)
 	}
 
@@ -841,8 +818,8 @@ func (lapi *Client) DeactivateMany(ids []string) (int, error) {
 	return mr.RowCount, nil
 }
 
-func (lapi *Client) getStream(url, metricName string) (*CreateStreamResp, error) {
-	var stream *CreateStreamResp
+func (lapi *Client) getStream(url, metricName string) (*Stream, error) {
+	var stream *Stream
 	if err := lapi.getJSON(url, "stream", metricName, &stream); err != nil {
 		return nil, err
 	} else if stream == nil {
@@ -977,14 +954,7 @@ func (lapi *Client) doRequest(method, url, resourceType, metricName string, inpu
 	}
 	defer resp.Body.Close()
 
-	if (method == "GET" && resp.StatusCode != http.StatusOK) || (resp.StatusCode >= 300) {
-		b, _ := ioutil.ReadAll(resp.Body)
-		glog.Errorf("Status error from Livepeer API resource=%s method=%s url=%s status=%d body=%q", resourceType, method, url, resp.StatusCode, string(b))
-		if resp.StatusCode == http.StatusNotFound {
-			lapi.metrics.APIRequest(metricName, 0, ErrNotExists)
-			return ErrNotExists
-		}
-		err := errors.New(http.StatusText(resp.StatusCode))
+	if err := checkResponseError(resp); err != nil {
 		lapi.metrics.APIRequest(metricName, 0, err)
 		return err
 	}
@@ -1036,6 +1006,7 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 	}
 	if resp != nil {
 		status = resp.Status
+		defer resp.Body.Close()
 	}
 	glog.V(DEBUG).Infof("Post segment manifest=%s seqNo=%d dur=%s took=%s timed_out=%v status='%v' err=%v",
 		sid, seqNo, dur, postTook, timedout, status, err)
@@ -1043,11 +1014,9 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 		return nil, err
 	}
 	glog.V(VERBOSE).Infof("Got transcoded manifest=%s seqNo=%d resp status=%s reading body started", sid, seqNo, resp.Status)
-	if resp.StatusCode != http.StatusOK {
-		b, _ := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		glog.V(DEBUG).Infof("Got manifest=%s seqNo=%d resp status=%s error in body $%s", sid, seqNo, resp.Status, string(b))
-		return nil, fmt.Errorf("transcode error %s: %s", resp.Status, b)
+	if err := checkResponseError(resp); err != nil {
+		glog.V(DEBUG).Infof("Got manifest=%s seqNo=%d resp status=%s error=%+v", sid, seqNo, resp.Status, err)
+		return nil, fmt.Errorf("transcode error: %w", err)
 	}
 	started := time.Now()
 	mediaType, params, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
@@ -1111,4 +1080,29 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 		return nil, err
 	}
 	return segments, nil
+}
+
+func checkResponseError(resp *http.Response) error {
+	if isSuccessStatus(resp.StatusCode) {
+		return nil
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	glog.Errorf("Status error from Livepeer API method=%s url=%s status=%d body=%q", resp.Request.Method, resp.Request.URL, resp.StatusCode, string(body))
+	if err != nil {
+		return fmt.Errorf("failed reading error response (%s): %w", resp.Status, err)
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return ErrNotExists
+	}
+	var errResp struct {
+		Errors []string `json:"errors"`
+	}
+	if err := json.Unmarshal(body, &errResp); err != nil {
+		return fmt.Errorf("request failed (%s) and failed parsing error response (%s): %w", resp.Status, body, err)
+	}
+	return fmt.Errorf("error response (%s) from api: %v", resp.Status, errResp.Errors)
+}
+
+func isSuccessStatus(status int) bool {
+	return status >= 200 && status < 300
 }
