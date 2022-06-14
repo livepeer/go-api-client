@@ -1,5 +1,4 @@
-// Package livepeer API
-package livepeerAPI
+package api
 
 import (
 	"bytes"
@@ -12,7 +11,6 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -35,11 +33,14 @@ const (
 // ErrNotExists returned if receives a 404 error from the API
 var ErrNotExists = errors.New("not found")
 
-const httpTimeout = 4 * time.Second
 const setActiveTimeout = 1500 * time.Millisecond
 
 var defaultHTTPClient = &http.Client{
-	Timeout: httpTimeout,
+	Timeout: 4 * time.Second,
+}
+
+var pushSegmentHTTPClient = &http.Client{
+	Timeout: 2 * time.Minute,
 }
 
 var hostName, _ = os.Hostname()
@@ -894,11 +895,18 @@ func (lapi *Client) GetObjectStore(id string) (*ObjectStore, error) {
 	return &os, nil
 }
 
-func Timedout(e error) bool {
-	t, ok := e.(interface {
+func Timedout(err error) bool {
+	if err == nil {
+		return false
+	}
+	var terr interface {
 		Timeout() bool
-	})
-	return ok && t.Timeout() || (e != nil && strings.Contains(e.Error(), "Client.Timeout"))
+	}
+	if errors.As(err, &terr) && terr.Timeout() {
+		return true
+	}
+	errMsg := strings.ToLower(err.Error())
+	return strings.Contains(errMsg, "client.timeout")
 }
 
 func (lapi *Client) newRequest(method, url string, bodyObj interface{}) (*http.Request, error) {
@@ -971,6 +979,17 @@ func (lapi *Client) doRequest(method, url, resourceType, metricName string, inpu
 	return json.Unmarshal(b, output)
 }
 
+// PushSegmentR pushes a segment with retries
+func (lapi *Client) PushSegmentR(sid string, seqNo int, dur time.Duration, segData []byte, resolution string) (transcoded [][]byte, err error) {
+	for try := 1; try <= 3; try++ {
+		transcoded, err = lapi.PushSegment(sid, seqNo, dur, segData, resolution)
+		if err == nil || !Timedout(err) {
+			return
+		}
+	}
+	return
+}
+
 func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segData []byte, resolution string) ([][]byte, error) {
 	var err error
 	if len(lapi.broadcasters) == 0 {
@@ -982,10 +1001,12 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 			return nil, fmt.Errorf("no broadcasters available")
 		}
 	}
+	timeout := 3*time.Second + 3*dur
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 	urlToUp := fmt.Sprintf("%s/live/%s/%d.ts", lapi.broadcasters[0], sid, seqNo)
-	var body io.Reader
-	body = bytes.NewReader(segData)
-	req, err := http.NewRequest("POST", urlToUp, body)
+	body := bytes.NewReader(segData)
+	req, err := http.NewRequestWithContext(ctx, "POST", urlToUp, body)
 	if err != nil {
 		return nil, err
 	}
@@ -996,20 +1017,15 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 	}
 
 	postStarted := time.Now()
-	resp, err := lapi.httpClient.Do(req)
+	resp, err := pushSegmentHTTPClient.Do(req)
 	postTook := time.Since(postStarted)
-	var timedout bool
 	var status string
-	if err != nil {
-		uerr := err.(*url.Error)
-		timedout = uerr.Timeout()
-	}
 	if resp != nil {
 		status = resp.Status
 		defer resp.Body.Close()
 	}
 	glog.V(DEBUG).Infof("Post segment manifest=%s seqNo=%d dur=%s took=%s timed_out=%v status='%v' err=%v",
-		sid, seqNo, dur, postTook, timedout, status, err)
+		sid, seqNo, dur, postTook, Timedout(err), status, err)
 	if err != nil {
 		return nil, err
 	}
