@@ -234,6 +234,16 @@ type (
 		Status TaskStatus `json:"status"`
 	}
 
+	importAssetRequest struct {
+		Name string `json:"name,omitempty"`
+		URL  string `json:"url"`
+	}
+
+	ImportAssetResp struct {
+		Asset Asset `json:"asset"`
+		Task  Task  `json:"task"`
+	}
+
 	transcodeAssetRequest struct {
 		Name    string  `json:"name,omitempty"`
 		AssetId string  `json:"assetId"`
@@ -899,6 +909,20 @@ func (lapi *Client) UpdateTaskStatus(id string, phase string, progress float64) 
 	}
 	glog.V(logs.DEBUG).Infof("Updated task progress id=%s phase=%s progress=%v output=%q", id, phase, progress, string(output))
 	return nil
+}
+
+func (lapi *Client) ImportAsset(url string, name string) (*Asset, *Task, error) {
+	var (
+		requestUrl = fmt.Sprintf("%s/api/asset/import", lapi.chosenServer)
+		input      = &importAssetRequest{URL: url, Name: name}
+		output     ImportAssetResp
+	)
+	err := lapi.doRequest("POST", requestUrl, "import_task", "", input, &output)
+	if err != nil {
+		return nil, nil, err
+	}
+	glog.V(logs.DEBUG).Infof("Created import task id=%s assetId=%s status=%s type=%s", output.Task.ID, output.Asset.ID, output.Task.Status.Phase, output.Task.Type)
+	return &output.Asset, &output.Task, nil
 }
 
 func (lapi *Client) TranscodeAsset(assetId string, name string, profile Profile) (*Asset, *Task, error) {
