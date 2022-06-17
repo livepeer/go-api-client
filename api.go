@@ -239,18 +239,12 @@ type (
 		URL  string `json:"url"`
 	}
 
-	ImportAssetResp struct {
-		Asset Asset `json:"asset"`
-		Task  Task  `json:"task"`
-	}
-
 	transcodeAssetRequest struct {
 		Name    string  `json:"name,omitempty"`
-		AssetId string  `json:"assetId"`
 		Profile Profile `json:"profile,omitempty"`
 	}
 
-	TranscodeAssetResp struct {
+	TaskAndAsset struct {
 		Asset Asset `json:"asset"`
 		Task  Task  `json:"task"`
 	}
@@ -262,7 +256,8 @@ type (
 	}
 
 	IPFS struct {
-		Pinata *Pinata `json:"pinata,omitempty"`
+		Pinata      *Pinata     `json:"pinata,omitempty"`
+		NFTMetadata interface{} `json:"nftMetadata,omitempty"`
 	}
 
 	exportAssetRequest struct {
@@ -915,9 +910,9 @@ func (lapi *Client) ImportAsset(url string, name string) (*Asset, *Task, error) 
 	var (
 		requestUrl = fmt.Sprintf("%s/api/asset/import", lapi.chosenServer)
 		input      = &importAssetRequest{URL: url, Name: name}
-		output     ImportAssetResp
+		output     TaskAndAsset
 	)
-	err := lapi.doRequest("POST", requestUrl, "import_task", "", input, &output)
+	err := lapi.doRequest("POST", requestUrl, "import_asset", "", input, &output)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -927,11 +922,11 @@ func (lapi *Client) ImportAsset(url string, name string) (*Asset, *Task, error) 
 
 func (lapi *Client) TranscodeAsset(assetId string, name string, profile Profile) (*Asset, *Task, error) {
 	var (
-		url    = fmt.Sprintf("%s/api/asset/transcode", lapi.chosenServer)
-		input  = &transcodeAssetRequest{AssetId: assetId, Name: name, Profile: profile}
-		output TranscodeAssetResp
+		url    = fmt.Sprintf("%s/api/asset/%s/transcode", lapi.chosenServer, assetId)
+		input  = &transcodeAssetRequest{Name: name, Profile: profile}
+		output TaskAndAsset
 	)
-	err := lapi.doRequest("POST", url, "transcode_task", "", input, &output)
+	err := lapi.doRequest("POST", url, "transcode_asset", "", input, &output)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -945,7 +940,7 @@ func (lapi *Client) ExportAsset(assetId string) (*Task, error) {
 		input  = &exportAssetRequest{IPFS: &IPFS{}}
 		output ExportAssetResp
 	)
-	err := lapi.doRequest("POST", url, "export_task", "", input, &output)
+	err := lapi.doRequest("POST", url, "export_asset", "", input, &output)
 	if err != nil {
 		return nil, err
 	}
@@ -988,7 +983,7 @@ func (lapi *Client) GetAsset(id string) (*Asset, error) {
 
 func (lapi *Client) ListAssets() (*[]Asset, error) {
 	var assets []Asset
-	url := fmt.Sprintf("%s/api/asset/", lapi.chosenServer)
+	url := fmt.Sprintf("%s/api/asset", lapi.chosenServer)
 	if err := lapi.getJSON(url, "asset", "", &assets); err != nil {
 		return nil, err
 	}
