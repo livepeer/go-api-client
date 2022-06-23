@@ -182,6 +182,18 @@ type (
 			Export    *ExportTaskParams    `json:"export"`
 			Transcode *TranscodeTaskParams `json:"transcode"`
 		} `json:"params"`
+		Output *struct {
+			Export *struct {
+				IPFS *struct {
+					VideoFileCid          string `json:"videoFileCid"`
+					NftMetadataCid        string `json:"nftMetadataCid"`
+					VideoFileUrl          string `json:"videoFileUrl"`
+					VideoFileGatewayUrl   string `json:"videoFileGatewayUrl"`
+					NftMetadataUrl        string `json:"nftMetadataUrl"`
+					NftMetadataGatewayUrl string `json:"nftMetadataGatewayUrl"`
+				} `json:"ipfs"`
+			} `json:"export"`
+		} `json:"output"`
 		Status TaskStatus `json:"status"`
 	}
 
@@ -222,14 +234,54 @@ type (
 		Status TaskStatus `json:"status"`
 	}
 
+	importAssetRequest struct {
+		Name string `json:"name,omitempty"`
+		URL  string `json:"url"`
+	}
+
+	transcodeAssetRequest struct {
+		Name    string  `json:"name,omitempty"`
+		Profile Profile `json:"profile,omitempty"`
+	}
+
+	TaskAndAsset struct {
+		Asset Asset `json:"asset"`
+		Task  Task  `json:"task"`
+	}
+
+	Pinata struct {
+		JWT       string `json:"jwt,omitempty"`
+		APIKey    string `json:"apiKey,omitempty"`
+		APISecret string `json:"apiSecret,omitempty"`
+	}
+
+	IPFS struct {
+		Pinata      *Pinata     `json:"pinata,omitempty"`
+		NFTMetadata interface{} `json:"nftMetadata,omitempty"`
+	}
+
+	exportAssetRequest struct {
+		IPFS *IPFS `json:"ipfs,omitempty"`
+	}
+
+	ExportAssetResp struct {
+		Task Task `json:"task"`
+	}
+
 	Asset struct {
-		ID            string `json:"id"`
-		PlaybackID    string `json:"playbackId"`
-		UserID        string `json:"userId"`
-		CreatedAt     int64  `json:"createdAt"`
-		SourceAssetId string `json:"sourceAssetId,omitempty"`
-		ObjectStoreID string `json:"objectStoreId"`
+		ID            string      `json:"id"`
+		PlaybackID    string      `json:"playbackId"`
+		UserID        string      `json:"userId"`
+		CreatedAt     int64       `json:"createdAt"`
+		SourceAssetId string      `json:"sourceAssetId,omitempty"`
+		Status        AssetStatus `json:"status"`
+		ObjectStoreID string      `json:"objectStoreId"`
 		AssetSpec
+	}
+
+	AssetStatus struct {
+		Phase     string `json:"phase"`
+		UpdatedAt int64  `json:"updatedAt,omitempty"`
 	}
 
 	AssetSpec struct {
@@ -854,6 +906,48 @@ func (lapi *Client) UpdateTaskStatus(id string, phase string, progress float64) 
 	return nil
 }
 
+func (lapi *Client) ImportAsset(url string, name string) (*Asset, *Task, error) {
+	var (
+		requestUrl = fmt.Sprintf("%s/api/asset/import", lapi.chosenServer)
+		input      = &importAssetRequest{URL: url, Name: name}
+		output     TaskAndAsset
+	)
+	err := lapi.doRequest("POST", requestUrl, "import_asset", "", input, &output)
+	if err != nil {
+		return nil, nil, err
+	}
+	glog.V(logs.DEBUG).Infof("Created import task id=%s assetId=%s status=%s type=%s", output.Task.ID, output.Asset.ID, output.Task.Status.Phase, output.Task.Type)
+	return &output.Asset, &output.Task, nil
+}
+
+func (lapi *Client) TranscodeAsset(assetId string, name string, profile Profile) (*Asset, *Task, error) {
+	var (
+		url    = fmt.Sprintf("%s/api/asset/%s/transcode", lapi.chosenServer, assetId)
+		input  = &transcodeAssetRequest{Name: name, Profile: profile}
+		output TaskAndAsset
+	)
+	err := lapi.doRequest("POST", url, "transcode_asset", "", input, &output)
+	if err != nil {
+		return nil, nil, err
+	}
+	glog.V(logs.DEBUG).Infof("Created transcode task id=%s assetId=%s status=%s type=%s", output.Task.ID, output.Asset.ID, output.Task.Status.Phase, output.Task.Type)
+	return &output.Asset, &output.Task, nil
+}
+
+func (lapi *Client) ExportAsset(assetId string) (*Task, error) {
+	var (
+		url    = fmt.Sprintf("%s/api/asset/%s/export", lapi.chosenServer, assetId)
+		input  = &exportAssetRequest{IPFS: &IPFS{}}
+		output ExportAssetResp
+	)
+	err := lapi.doRequest("POST", url, "export_asset", "", input, &output)
+	if err != nil {
+		return nil, err
+	}
+	glog.V(logs.DEBUG).Infof("Created export task id=%s status=%s type=%s", output.Task.ID, output.Task.Status.Phase, output.Task.Type)
+	return &output.Task, nil
+}
+
 func (lapi *Client) GetMultistreamTarget(id string) (*MultistreamTarget, error) {
 	var target MultistreamTarget
 	url := fmt.Sprintf("%s/api/multistream/target/%s", lapi.chosenServer, id)
@@ -885,6 +979,15 @@ func (lapi *Client) GetAsset(id string) (*Asset, error) {
 		return nil, err
 	}
 	return &asset, nil
+}
+
+func (lapi *Client) ListAssets() (*[]Asset, error) {
+	var assets []Asset
+	url := fmt.Sprintf("%s/api/asset", lapi.chosenServer)
+	if err := lapi.getJSON(url, "asset", "", &assets); err != nil {
+		return nil, err
+	}
+	return &assets, nil
 }
 
 func (lapi *Client) GetObjectStore(id string) (*ObjectStore, error) {
