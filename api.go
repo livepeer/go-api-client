@@ -198,9 +198,10 @@ type (
 	}
 
 	TaskStatus struct {
-		Phase     string  `json:"phase"`
-		Progress  float64 `json:"progress"`
-		UpdatedAt int64   `json:"updatedAt,omitempty"`
+		Phase        string  `json:"phase"`
+		Progress     float64 `json:"progress"`
+		UpdatedAt    int64   `json:"updatedAt,omitempty"`
+		ErrorMessage string  `json:"errorMessage,omitempty"`
 	}
 
 	ImportTaskParams struct {
@@ -280,8 +281,9 @@ type (
 	}
 
 	AssetStatus struct {
-		Phase     string `json:"phase"`
-		UpdatedAt int64  `json:"updatedAt,omitempty"`
+		Phase        string `json:"phase"`
+		UpdatedAt    int64  `json:"updatedAt,omitempty"`
+		ErrorMessage string `json:"errorMessage,omitempty"`
 	}
 
 	AssetSpec struct {
@@ -895,7 +897,7 @@ func (lapi *Client) GetTask(id string) (*Task, error) {
 func (lapi *Client) UpdateTaskStatus(id string, phase string, progress float64) error {
 	var (
 		url    = fmt.Sprintf("%s/api/task/%s/status", lapi.chosenServer, id)
-		input  = &updateTaskProgressRequest{Status: TaskStatus{phase, progress, 0}}
+		input  = &updateTaskProgressRequest{Status: TaskStatus{phase, progress, 0, ""}}
 		output json.RawMessage
 	)
 	err := lapi.doRequest("POST", url, "task", "update_task_progress", input, &output)
