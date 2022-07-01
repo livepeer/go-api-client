@@ -1,0 +1,22 @@
+name: Create release on github
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions-ecosystem/action-regex-match@v2
+        id: match-tag
+        with:
+          text: ${{ github.ref_name }}
+          regex: '^v([0-9]+\.\d+\.\d+)$'
+
+      - name: Release to github
+        uses: softprops/action-gh-release@v1
+        if: ${{ steps.match-tag.outputs.match != '' }}
+        with:
+          generate_release_notes: true
