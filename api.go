@@ -1010,6 +1010,11 @@ func (lapi *Client) GetAssetByPlaybackID(pid string, includeDeleted bool) (*Asse
 	return assets[0], nil
 }
 
+func (lapi *Client) DeleteAsset(id string) error {
+	url := fmt.Sprintf("%s/api/asset/%s", lapi.chosenServer, id)
+	return lapi.doRequest("DELETE", url, "asset", "", nil, nil)
+}
+
 func (lapi *Client) GetObjectStore(id string) (*ObjectStore, error) {
 	var os ObjectStore
 	url := fmt.Sprintf("%s/api/object-store/%s", lapi.chosenServer, id)
@@ -1100,6 +1105,9 @@ func (lapi *Client) doRequest(method, url, resourceType, metricName string, inpu
 	took := time.Since(start)
 	lapi.metrics.APIRequest(metricName, took, nil)
 
+	if output == nil {
+		return nil
+	}
 	return json.Unmarshal(b, output)
 }
 
