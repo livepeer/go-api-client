@@ -271,6 +271,7 @@ type (
 
 	Asset struct {
 		ID            string      `json:"id"`
+		Deleted       bool        `json:"deleted,omitempty"`
 		PlaybackID    string      `json:"playbackId"`
 		UserID        string      `json:"userId"`
 		CreatedAt     int64       `json:"createdAt"`
@@ -983,13 +984,30 @@ func (lapi *Client) GetAsset(id string) (*Asset, error) {
 	return &asset, nil
 }
 
-func (lapi *Client) ListAssets() (*[]Asset, error) {
-	var assets []Asset
+func (lapi *Client) ListAssets() ([]*Asset, error) {
+	var assets []*Asset
 	url := fmt.Sprintf("%s/api/asset", lapi.chosenServer)
 	if err := lapi.getJSON(url, "asset", "", &assets); err != nil {
 		return nil, err
 	}
-	return &assets, nil
+	return assets, nil
+}
+
+func (lapi *Client) GetAssetByPlaybackID(pid string, includeDeleted bool) (*Asset, error) {
+	var assets []*Asset
+	url := fmt.Sprintf(`%s/api/asset?limit=2&allUsers=true&filters=[{"id":"playbackId","value":%q}]`, lapi.chosenServer, pid)
+	if includeDeleted {
+		url += `&all=true`
+	}
+	if err := lapi.getJSON(url, "asset", "", &assets); err != nil {
+		return nil, err
+	}
+	if len(assets) == 0 {
+		return nil, ErrNotExists
+	} else if len(assets) > 1 {
+		return nil, fmt.Errorf("multiple assets found for playbackId %q", pid)
+	}
+	return assets[0], nil
 }
 
 func (lapi *Client) GetObjectStore(id string) (*ObjectStore, error) {
