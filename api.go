@@ -1018,20 +1018,27 @@ func (lapi *Client) ListAssets(opts ListOptions) ([]*Asset, string, error) {
 	}
 
 	var assets []*Asset
-	url := fmt.Sprintf("%s/api/asset", lapi.chosenServer)
-	if err := lapi.getJSON(url, "asset", "", &assets); err != nil {
-		return nil, err
+	headers, err := lapi.doRequestHeaders("GET", url, "asset", "list-assets", nil, &assets)
+	if err != nil {
+		return nil, "", err
 	}
-	return assets, nil
+	next := ""
+	links := linkheader.ParseMultiple(headers["Link"]).FilterByRel("next")
+	if len(links) > 0 {
+		next = links[0].URL
+	}
+	return assets, next, nil
 }
 
 func (lapi *Client) GetAssetByPlaybackID(pid string, includeDeleted bool) (*Asset, error) {
-	var assets []*Asset
-	url := fmt.Sprintf(`%s/api/asset?limit=2&allUsers=true&filters=[{"id":"playbackId","value":%q}]`, lapi.chosenServer, pid)
-	if includeDeleted {
-		url += `&all=true`
-	}
-	if err := lapi.getJSON(url, "asset", "", &assets); err != nil {
+	assets, _, err := lapi.ListAssets(ListOptions{
+		Limit:          2,
+		AllUsers:       true,
+		IncludeDeleted: includeDeleted,
+		Filters: map[string]interface{}{
+			"playbackId": pid,
+		}})
+	if err != nil {
 		return nil, err
 	}
 	if len(assets) == 0 {
