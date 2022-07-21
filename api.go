@@ -19,6 +19,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/livepeer/go-api-client/logs"
 	"github.com/livepeer/go-api-client/metrics"
+	"github.com/tomnomnom/linkheader"
 )
 
 const (
@@ -360,6 +361,14 @@ type (
 
 	deactivateManyResp struct {
 		RowCount int `json:"rowCount"`
+	}
+
+	ListOptions struct {
+		Limit                    int
+		Cursor                   string
+		AllUsers, IncludeDeleted bool
+		Filters                  map[string]interface{}
+		Order                    map[string]bool
 	}
 )
 
@@ -984,7 +993,30 @@ func (lapi *Client) GetAsset(id string) (*Asset, error) {
 	return &asset, nil
 }
 
-func (lapi *Client) ListAssets() ([]*Asset, error) {
+func (lapi *Client) ListAssets(opts ListOptions) ([]*Asset, string, error) {
+	if opts.Limit <= 0 {
+		opts.Limit = 10
+	}
+	url := fmt.Sprintf("%s/api/asset?limit=%d&cursor=%s&allUsers=%v&all=%v", lapi.chosenServer, opts.Limit, opts.Cursor, opts.AllUsers, opts.IncludeDeleted)
+	if len(opts.Filters) > 0 {
+		filtersStrs := make([]string, 0, len(opts.Filters))
+		for k, v := range opts.Filters {
+			vb, err := json.Marshal(v)
+			if err != nil {
+				return nil, "", fmt.Errorf("error marshaling filter: %w", err)
+			}
+			filtersStrs = append(filtersStrs, fmt.Sprintf(`{"id":%q,"value":%s}`, k, vb))
+		}
+		url += fmt.Sprintf(`&filters=[%s]`, strings.Join(filtersStrs, ","))
+	}
+	if len(opts.Order) > 0 {
+		orderStrs := make([]string, 0, len(opts.Order))
+		for field, descending := range opts.Order {
+			orderStrs = append(orderStrs, fmt.Sprintf(`%s-%v`, field, descending))
+		}
+		url += fmt.Sprintf(`&order=%s`, strings.Join(orderStrs, ","))
+	}
+
 	var assets []*Asset
 	url := fmt.Sprintf("%s/api/asset", lapi.chosenServer)
 	if err := lapi.getJSON(url, "asset", "", &assets); err != nil {
@@ -1074,41 +1106,46 @@ func (lapi *Client) getJSON(url, resourceType, metricName string, output interfa
 }
 
 func (lapi *Client) doRequest(method, url, resourceType, metricName string, input, output interface{}) error {
+	_, err := lapi.doRequestHeaders(method, url, resourceType, metricName, input, output)
+	return err
+}
+
+func (lapi *Client) doRequestHeaders(method, url, resourceType, metricName string, input, output interface{}) (http.Header, error) {
 	if metricName == "" {
 		metricName = strings.ToLower(method + "_" + resourceType)
 	}
 	start := time.Now()
 	req, err := lapi.newRequest(method, url, input)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	resp, err := lapi.httpClient.Do(req)
 	if err != nil {
 		glog.Errorf("Error calling Livepeer API resource=%s method=%s url=%s error=%q", resourceType, method, url, err)
 		lapi.metrics.APIRequest(metricName, 0, err)
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if err := checkResponseError(resp); err != nil {
 		lapi.metrics.APIRequest(metricName, 0, err)
-		return err
+		return resp.Header, err
 	}
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		glog.Errorf("Error reading Livepeer API response body resource=%s method=%s url=%s error=%q", resourceType, method, url, err)
 		lapi.metrics.APIRequest(metricName, 0, err)
-		return err
+		return resp.Header, err
 	}
 	took := time.Since(start)
 	lapi.metrics.APIRequest(metricName, took, nil)
 
 	if output == nil {
-		return nil
+		return resp.Header, nil
 	}
-	return json.Unmarshal(b, output)
+	return resp.Header, json.Unmarshal(b, output)
 }
 
 // PushSegmentR pushes a segment with retries
