@@ -589,6 +589,20 @@ func (lapi *Client) CreateStreamEx(name string, record bool, presets []string, p
 	return lapi.CreateStream(CreateStreamReq{Name: name, Record: record, Presets: presets, Profiles: profiles})
 }
 
+// CreateStreamR creates a stream with retries
+func (lapi *Client) CreateStreamR(csr CreateStreamReq) (stream *Stream, err error) {
+	for try := 1; try <= 3; try++ {
+		stream, err = lapi.CreateStream(csr)
+		if err == nil || !Timedout(err) {
+			return
+		}
+		if try < 3 {
+			time.Sleep(time.Duration(try) * time.Second)
+		}
+	}
+	return
+}
+
 // CreateStream creates stream with specified name and profiles
 func (lapi *Client) CreateStream(csr CreateStreamReq) (*Stream, error) {
 	if csr.Name == "" {
