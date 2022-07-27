@@ -589,6 +589,20 @@ func (lapi *Client) CreateStreamEx(name string, record bool, presets []string, p
 	return lapi.CreateStream(CreateStreamReq{Name: name, Record: record, Presets: presets, Profiles: profiles})
 }
 
+// CreateStreamR creates a stream with retries
+func (lapi *Client) CreateStreamR(csr CreateStreamReq) (stream *Stream, err error) {
+	for try := 1; try <= 3; try++ {
+		stream, err = lapi.CreateStream(csr)
+		if err == nil || !Timedout(err) {
+			return
+		}
+		if try < 3 {
+			time.Sleep(time.Duration(try) * time.Second)
+		}
+	}
+	return
+}
+
 // CreateStream creates stream with specified name and profiles
 func (lapi *Client) CreateStream(csr CreateStreamReq) (*Stream, error) {
 	if csr.Name == "" {
@@ -1074,7 +1088,9 @@ func Timedout(err error) bool {
 		return true
 	}
 	errMsg := strings.ToLower(err.Error())
-	return strings.Contains(errMsg, "client.timeout")
+	return strings.Contains(errMsg, "client.timeout") ||
+		strings.Contains(errMsg, "context canceled") ||
+		strings.Contains(errMsg, "context deadline exceeded")
 }
 
 func (lapi *Client) newRequest(method, url string, bodyObj interface{}) (*http.Request, error) {
@@ -1159,8 +1175,12 @@ func (lapi *Client) doRequestHeaders(method, url, resourceType, metricName strin
 func (lapi *Client) PushSegmentR(sid string, seqNo int, dur time.Duration, segData []byte, resolution string) (transcoded [][]byte, err error) {
 	for try := 1; try <= 3; try++ {
 		transcoded, err = lapi.PushSegment(sid, seqNo, dur, segData, resolution)
-		if err == nil || !Timedout(err) {
+		if err == nil || !Timedout(err) ||
+			strings.Contains(err.Error(), "Could not create stream ID") {
 			return
+		}
+		if try < 3 {
+			time.Sleep(time.Duration(try) * time.Second)
 		}
 	}
 	return
