@@ -1165,6 +1165,9 @@ func (lapi *Client) PushSegmentR(sid string, seqNo int, dur time.Duration, segDa
 			strings.Contains(err.Error(), "Could not create stream ID") {
 			return
 		}
+		if try < 3 {
+			time.Sleep(time.Duration(try) * time.Second)
+		}
 	}
 	return
 }
