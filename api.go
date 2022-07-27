@@ -1074,7 +1074,9 @@ func Timedout(err error) bool {
 		return true
 	}
 	errMsg := strings.ToLower(err.Error())
-	return strings.Contains(errMsg, "client.timeout")
+	return strings.Contains(errMsg, "client.timeout") ||
+		strings.Contains(errMsg, "context canceled") ||
+		strings.Contains(errMsg, "context deadline exceeded")
 }
 
 func (lapi *Client) newRequest(method, url string, bodyObj interface{}) (*http.Request, error) {
