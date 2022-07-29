@@ -1175,10 +1175,14 @@ func (lapi *Client) doRequestHeaders(method, url, resourceType, metricName strin
 func (lapi *Client) PushSegmentR(sid string, seqNo int, dur time.Duration, segData []byte, resolution string) (transcoded [][]byte, err error) {
 	const maxTries = 6
 	backoff := 1 * time.Second
+	shouldRetry := func(err error) bool {
+		errMsg := strings.ToLower(err.Error())
+		return Timedout(err) ||
+			strings.Contains(errMsg, "could not create stream id")
+	}
 	for try := 1; try <= maxTries; try++ {
 		transcoded, err = lapi.PushSegment(sid, seqNo, dur, segData, resolution)
-		if err == nil || !Timedout(err) ||
-			strings.Contains(err.Error(), "Could not create stream ID") {
+		if err == nil || !shouldRetry(err) {
 			return
 		}
 		if try < maxTries {
