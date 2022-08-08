@@ -182,7 +182,8 @@ type (
 		OutputAssetID string `json:"outputAssetId,omitempty"`
 		Type          string `json:"type"`
 		Params        struct {
-			Import    *ImportTaskParams    `json:"import"`
+			Upload    *UploadTaskParams    `json:"upload"`
+			Import    *UploadTaskParams    `json:"import"`
 			Export    *ExportTaskParams    `json:"export"`
 			Transcode *TranscodeTaskParams `json:"transcode"`
 		} `json:"params"`
@@ -208,7 +209,7 @@ type (
 		ErrorMessage string  `json:"errorMessage,omitempty"`
 	}
 
-	ImportTaskParams struct {
+	UploadTaskParams struct {
 		URL               string `json:"url,omitempty"`
 		RecordedSessionID string `json:"recordedSessionId,omitempty"`
 		UploadedObjectKey string `json:"uploadedObjectKey,omitempty"`
@@ -279,9 +280,9 @@ type (
 		PlaybackID    string      `json:"playbackId"`
 		UserID        string      `json:"userId"`
 		CreatedAt     int64       `json:"createdAt"`
-		SourceAssetId string      `json:"sourceAssetId,omitempty"`
-		Status        AssetStatus `json:"status"`
+		SourceAssetID string      `json:"sourceAssetId,omitempty"`
 		ObjectStoreID string      `json:"objectStoreId"`
+		Status        AssetStatus `json:"status"`
 		AssetSpec
 	}
 
@@ -297,6 +298,7 @@ type (
 		Size                uint64          `json:"size"`
 		Hash                []AssetHash     `json:"hash"`
 		VideoSpec           *AssetVideoSpec `json:"videoSpec,omitempty"`
+		Storage             AssetStorage    `json:"storage"`
 		PlaybackRecordingID string          `json:"playbackRecordingId,omitempty"`
 	}
 
@@ -327,6 +329,30 @@ type (
 		Channels   int `json:"channels,omitempty"`
 		SampleRate int `json:"sampleRate,omitempty"`
 		BitDepth   int `json:"bitDepth,omitempty"`
+	}
+
+	AssetStorage struct {
+		IPFS   *AssetIPFS `json:"ipfs,omitempty"`
+		Status struct {
+			Phase        string            `json:"phase"`
+			ErrorMessage string            `json:"errorMessage,omitempty"`
+			Tasks        map[string]string `json:"tasks"`
+		} `json:"status,omitempty"`
+	}
+
+	AssetIPFS struct {
+		IPFSFileInfo
+		NFTMetadata *IPFSFileInfo `json:"nftMetadata,omitempty"`
+		Spec        struct {
+			NFTMetadataTemplate `json:"nftMetadataTemplate,omitempty"`
+			NFTMetadata         map[string]interface{} `json:"nftMetadata,omitempty"`
+		} `json:"spec"`
+	}
+
+	IPFSFileInfo struct {
+		CID        string `json:"cid"`
+		GatewayUrl string `json:"gatewayUrl,omitempty"`
+		Url        string `json:"url,omitempty"`
 	}
 
 	ObjectStore struct {
