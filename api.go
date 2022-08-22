@@ -1306,7 +1306,7 @@ func checkResponseError(resp *http.Response) error {
 		return nil
 	}
 	body, err := ioutil.ReadAll(resp.Body)
-	glog.Errorf("Status error from Livepeer API method=%s url=%s status=%d body=%q", resp.Request.Method, resp.Request.URL, resp.StatusCode, string(body))
+	glog.V(logs.VERBOSE).Infof("Status error from Livepeer API method=%s url=%s status=%d body=%q", resp.Request.Method, resp.Request.URL, resp.StatusCode, string(body))
 	if err != nil {
 		return fmt.Errorf("failed reading error response (%s): %w", resp.Status, err)
 	}
