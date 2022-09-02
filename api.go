@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/eventials/go-tus"
 	"github.com/golang/glog"
 	"github.com/livepeer/go-api-client/logs"
 	"github.com/livepeer/go-api-client/metrics"
@@ -198,6 +199,10 @@ type (
 		Status TaskStatus `json:"status"`
 	}
 
+	TaskOnlyId struct {
+		ID string `json:"id"`
+	}
+
 	TaskStatus struct {
 		Phase        string  `json:"phase"`
 		Progress     float64 `json:"progress"`
@@ -241,6 +246,10 @@ type (
 		URL  string `json:"url"`
 	}
 
+	requestUploadRequest struct {
+		Name string `json:"name,omitempty"`
+	}
+
 	transcodeAssetRequest struct {
 		Name    string  `json:"name,omitempty"`
 		Profile Profile `json:"profile,omitempty"`
@@ -249,6 +258,13 @@ type (
 	TaskAndAsset struct {
 		Asset Asset `json:"asset"`
 		Task  Task  `json:"task"`
+	}
+
+	UploadUrls struct {
+		Url         string     `json:"url"`
+		TusEndpoint string     `json:"tusEndpoint"`
+		Asset       Asset      `json:"asset"`
+		Task        TaskOnlyId `json:"task"`
 	}
 
 	Pinata struct {
@@ -944,6 +960,53 @@ func (lapi *Client) ImportAsset(url string, name string) (*Asset, *Task, error) 
 	}
 	glog.V(logs.DEBUG).Infof("Created import task id=%s assetId=%s status=%s type=%s", output.Task.ID, output.Asset.ID, output.Task.Status.Phase, output.Task.Type)
 	return &output.Asset, &output.Task, nil
+}
+
+func (lapi *Client) RequestUpload(name string) (*UploadUrls, error) {
+	var (
+		requestUrl = fmt.Sprintf("%s/api/asset/request-upload", lapi.chosenServer)
+		input      = &requestUploadRequest{Name: name}
+		output     UploadUrls
+	)
+	err := lapi.doRequest("POST", requestUrl, "request_upload", "", input, &output)
+	if err != nil {
+		return nil, err
+	}
+	glog.V(logs.DEBUG).Infof("Created request upload for task id=%s assetId=%s status=%s type=%s", output.Task.ID, output.Asset.ID)
+	return &output, nil
+}
+
+func (lapi *Client) UploadAsset(url string, file io.Reader) error {
+	err := lapi.doRequest("PUT", url, "upload_asset", "", file, nil)
+	if err != nil {
+		return err
+	}
+	glog.V(logs.DEBUG).Infof("Uploaded asset to url=%s", url)
+	return nil
+}
+
+func (lapi *Client) ResumableUpload(url string, filePath string) error {
+	f, err := os.Open(filePath)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+	client, err := tus.NewClient(url, nil)
+	if err != nil {
+		return err
+	}
+	upload, err := tus.NewUploadFromFile(f)
+	if err != nil {
+		return err
+	}
+	uploader, err := client.CreateUpload(upload)
+	if err != nil {
+		return err
+	}
+
+	err = uploader.Upload()
+
+	return err
 }
 
 func (lapi *Client) TranscodeAsset(assetId string, name string, profile Profile) (*Asset, *Task, error) {
