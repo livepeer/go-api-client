@@ -985,17 +985,12 @@ func (lapi *Client) UploadAsset(url string, file io.Reader) error {
 	return nil
 }
 
-func (lapi *Client) ResumableUpload(url string, filePath string) error {
-	f, err := os.Open(filePath)
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
+func (lapi *Client) ResumableUpload(url string, file *os.File) error {
 	client, err := tus.NewClient(url, nil)
 	if err != nil {
 		return err
 	}
-	upload, err := tus.NewUploadFromFile(f)
+	upload, err := tus.NewUploadFromFile(file)
 	if err != nil {
 		return err
 	}
