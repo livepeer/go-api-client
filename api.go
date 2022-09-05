@@ -152,14 +152,17 @@ type (
 		Multistream                struct {
 			Targets []MultistreamTargetRef `json:"targets,omitempty"`
 		} `json:"multistream"`
+
+		// These can be present on parent stream objects if they are used to stream
+		// directly to broadcasters (i.e. not using the streamKey through RTMP)
+		RecordingStatus string `json:"recordingStatus,omitempty"` // ready, waiting
+		RecordingURL    string `json:"recordingUrl,omitempty"`
+		Mp4Url          string `json:"mp4Url,omitempty"`
 	}
 
 	// UserSession user's sessions
 	UserSession struct {
 		Stream
-		RecordingStatus string `json:"recordingStatus,omitempty"` // ready, waiting
-		RecordingURL    string `json:"recordingUrl,omitempty"`
-		Mp4Url          string `json:"mp4Url,omitempty"`
 	}
 
 	MultistreamTarget struct {
