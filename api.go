@@ -662,11 +662,14 @@ func (lapi *Client) GetStreamByPlaybackID(playbackID string) (*Stream, error) {
 }
 
 // GetStream gets stream by id
-func (lapi *Client) GetStream(id string) (*Stream, error) {
+func (lapi *Client) GetStream(id string, forceRecordingUrl bool) (*Stream, error) {
 	if id == "" {
 		return nil, errors.New("empty id")
 	}
 	u := fmt.Sprintf("%s/api/stream/%s", lapi.chosenServer, id)
+	if forceRecordingUrl {
+		u += "?forceUrl=1"
+	}
 	return lapi.getStream(u, "get_by_id")
 }
 
