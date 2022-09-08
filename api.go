@@ -972,7 +972,7 @@ func (lapi *Client) RequestUpload(name string) (*UploadUrls, error) {
 	if err != nil {
 		return nil, err
 	}
-	glog.V(logs.DEBUG).Infof("Created request upload for task id=%s assetId=%s status=%s type=%s", output.Task.ID, output.Asset.ID)
+	glog.V(logs.DEBUG).Infof("Created request upload for task id=%s assetId=%s status=%s", output.Task.ID, output.Asset.ID)
 	return &output, nil
 }
 
