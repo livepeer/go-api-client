@@ -297,8 +297,11 @@ type (
 		UserID        string      `json:"userId"`
 		CreatedAt     int64       `json:"createdAt"`
 		SourceAssetID string      `json:"sourceAssetId,omitempty"`
-		ObjectStoreID string      `json:"objectStoreId"`
 		Status        AssetStatus `json:"status"`
+
+		ObjectStoreID                  string `json:"objectStoreId"`
+		PlaybackRecordingObjectStoreID string `json:"playbackRecordingObjectStoreId,omitempty"`
+
 		AssetSpec
 	}
 
