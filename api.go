@@ -41,7 +41,7 @@ var defaultHTTPClient = &http.Client{
 	Timeout: 4 * time.Second,
 }
 
-var pushSegmentHTTPClient = &http.Client{
+var longTimeoutHTTPClient = &http.Client{
 	Timeout: 2 * time.Minute,
 }
 
@@ -1008,12 +1008,22 @@ func (lapi *Client) RequestUpload(name string) (*UploadUrls, error) {
 	return &output, nil
 }
 
-func (lapi *Client) UploadAsset(url string, file io.Reader) error {
-	err := lapi.doRequest("PUT", url, "upload_asset", "", file, nil)
+func (lapi *Client) UploadAsset(ctx context.Context, url string, file io.Reader) error {
+	req, err := http.NewRequestWithContext(ctx, "PUT", url, file)
 	if err != nil {
 		return err
 	}
-	glog.V(logs.DEBUG).Infof("Uploaded asset to url=%s", url)
+
+	startTime := time.Now()
+	resp, err := longTimeoutHTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if err := checkResponseError(resp); err != nil {
+		return err
+	}
+	glog.V(logs.DEBUG).Infof("Uploaded asset to url=%s dur=%v", url, time.Since(startTime))
 	return nil
 }
 
@@ -1310,7 +1320,7 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 	}
 
 	postStarted := time.Now()
-	resp, err := pushSegmentHTTPClient.Do(req)
+	resp, err := longTimeoutHTTPClient.Do(req)
 	postTook := time.Since(postStarted)
 	var status string
 	if resp != nil {
