@@ -1027,8 +1027,8 @@ func (lapi *Client) UploadAsset(ctx context.Context, url string, file io.Reader)
 	return nil
 }
 
+// Temporary function while waiting for go-api-client to get fixed
 func (lapi *Client) ResumableUpload(url string, file *os.File) error {
-
 	config := tus.DefaultConfig()
 	config.ChunkSize = 8 * 1024 * 1024 // 8MB
 
