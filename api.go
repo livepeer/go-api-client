@@ -1029,11 +1029,8 @@ func (lapi *Client) UploadAsset(ctx context.Context, url string, file io.Reader)
 
 func (lapi *Client) ResumableUpload(url string, file *os.File) error {
 
-	config := &tus.Config{
-		ChunkSize:           8 * 1024 * 1024,
-		Resume:              false,
-		OverridePatchMethod: false,
-	}
+	config := tus.DefaultConfig()
+	config.ChunkSize = 8 * 1024 * 1024 // 8MB
 
 	client, err := tus.NewClient(url, config)
 	if err != nil {
