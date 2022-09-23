@@ -977,7 +977,7 @@ func (lapi *Client) GetTask(id string) (*Task, error) {
 	return &task, nil
 }
 
-func (lapi *Client) UpdateTaskStatus(id string, phase string, progress float64) error {
+func (lapi *Client) UpdateTaskStatus(id string, phase TaskPhase, progress float64) error {
 	var (
 		url    = fmt.Sprintf("%s/api/task/%s/status", lapi.chosenServer, id)
 		input  = &updateTaskProgressRequest{Status: TaskStatus{phase, progress, 0, 0, ""}}
