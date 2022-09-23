@@ -62,6 +62,16 @@ const (
 	NFTMetadataTemplateFile   NFTMetadataTemplate = "file"
 )
 
+type TaskPhase string
+
+const (
+	TaskPhasePending   TaskPhase = "pending"
+	TaskPhaseWaiting   TaskPhase = "waiting"
+	TaskPhaseRunning   TaskPhase = "running"
+	TaskPhaseFailed    TaskPhase = "failed"
+	TaskPhaseCompleted TaskPhase = "completed"
+)
+
 type (
 	// Object with all options given to Livepeer API
 	ClientOptions struct {
@@ -208,11 +218,11 @@ type (
 	}
 
 	TaskStatus struct {
-		Phase        string  `json:"phase"`
-		Progress     float64 `json:"progress"`
-		Retries      int     `json:"retries,omitempty"`
-		UpdatedAt    int64   `json:"updatedAt,omitempty"`
-		ErrorMessage string  `json:"errorMessage,omitempty"`
+		Phase        TaskPhase `json:"phase"`
+		Progress     float64   `json:"progress"`
+		Retries      int       `json:"retries,omitempty"`
+		UpdatedAt    int64     `json:"updatedAt,omitempty"`
+		ErrorMessage string    `json:"errorMessage,omitempty"`
 	}
 
 	UploadTaskParams struct {
