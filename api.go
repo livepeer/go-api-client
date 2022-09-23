@@ -210,7 +210,7 @@ type (
 	TaskStatus struct {
 		Phase        string  `json:"phase"`
 		Progress     float64 `json:"progress"`
-		Retries      int     `json:"retries"`
+		Retries      int     `json:"retries,omitempty"`
 		UpdatedAt    int64   `json:"updatedAt,omitempty"`
 		ErrorMessage string  `json:"errorMessage,omitempty"`
 	}
