@@ -324,9 +324,15 @@ type (
 		Type                string          `json:"type"`
 		Size                uint64          `json:"size"`
 		Hash                []AssetHash     `json:"hash"`
+		Files               []AssetFile     `json:"files"`
 		VideoSpec           *AssetVideoSpec `json:"videoSpec,omitempty"`
 		Storage             AssetStorage    `json:"storage"`
 		PlaybackRecordingID string          `json:"playbackRecordingId,omitempty"`
+	}
+
+	AssetFile struct {
+		Type string `json:"type"`
+		Path string `json:"path"`
 	}
 
 	AssetHash struct {
