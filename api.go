@@ -741,7 +741,7 @@ func (lapi *Client) UpdateStream(id string, usr UpdateStreamReq) (*Stream, error
 	if err = json.NewDecoder(httpResp.Body).Decode(&stream); err != nil {
 		return nil, fmt.Errorf("error parsing update stream response: %w", err)
 	}
-	glog.Infof("Updated stream id=%q id=%s", stream.ID)
+	glog.Infof("Updated stream id=%q", stream.ID)
 	return stream, nil
 }
 
