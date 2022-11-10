@@ -121,10 +121,10 @@ type (
 		// - P240p30fps16x9
 		// - P240p30fps4x3
 		// - P144p30fps16x9
-		Profiles            []Profile `json:"profiles,omitempty"`
-		Record              bool      `json:"record,omitempty"`
-		RecordObjectStoreId string    `json:"recordObjectStoreId,omitempty"`
-		PlaybackPolicy      string    `json:"playbackPolicy,omitempty"`
+		Profiles            []Profile      `json:"profiles,omitempty"`
+		Record              bool           `json:"record,omitempty"`
+		RecordObjectStoreId string         `json:"recordObjectStoreId,omitempty"`
+		PlaybackPolicy      PlaybackPolicy `json:"playbackPolicy,omitempty"`
 	}
 
 	UpdateStreamReq struct {
