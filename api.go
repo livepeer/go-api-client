@@ -127,6 +127,11 @@ type (
 		PlaybackPolicy      string    `json:"playbackPolicy,omitempty"`
 	}
 
+	UpdateStreamReq struct {
+		Name           string         `json:"name,omitempty"`
+		PlaybackPolicy PlaybackPolicy `json:"playbackPolicy,omitempty"`
+	}
+
 	// Profile transcoding profile
 	Profile struct {
 		Name    string `json:"name,omitempty"`
@@ -703,6 +708,40 @@ func (lapi *Client) CreateStream(csr CreateStreamReq) (*Stream, error) {
 		return nil, fmt.Errorf("error parsing create stream response: %w", err)
 	}
 	glog.Infof("Created stream name=%q id=%s", csr.Name, stream.ID)
+	return stream, nil
+}
+
+func (lapi *Client) UpdateStream(id string, usr UpdateStreamReq) (*Stream, error) {
+
+	if usr.Name == "" {
+		glog.V(logs.DEBUG).Infof(`Updating Livepeer stream id=%q with name=%q`, id, usr.Name)
+	}
+
+	if (PlaybackPolicy{}) == usr.PlaybackPolicy {
+		glog.V(logs.DEBUG).Infof(`Updating Livepeer stream id=%q with playbackPolicy type=%q`, id, usr.PlaybackPolicy.Type)
+	}
+
+	u := fmt.Sprintf("%s/api/stream/%s", lapi.chosenServer, id)
+
+	req, err := lapi.newRequest("PATCH", u, usr)
+	if err != nil {
+		return nil, err
+	}
+	httpResp, err := lapi.httpClient.Do(req)
+	if err != nil {
+		glog.Errorf("Error updating stream err=%+v", err)
+		return nil, err
+	}
+	defer httpResp.Body.Close()
+
+	if err := checkResponseError(httpResp); err != nil {
+		return nil, fmt.Errorf("error updating stream: %w", err)
+	}
+	var stream *Stream
+	if err = json.NewDecoder(httpResp.Body).Decode(&stream); err != nil {
+		return nil, fmt.Errorf("error parsing update stream response: %w", err)
+	}
+	glog.Infof("Updated stream id=%q id=%s", stream.ID)
 	return stream, nil
 }
 
