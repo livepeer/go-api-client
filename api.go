@@ -103,6 +103,10 @@ type (
 		} `json:"servers,omitempty"`
 	}
 
+	PlaybackPolicy struct {
+		Type string `json:"type,omitempty"`
+	}
+
 	CreateStreamReq struct {
 		Name     string   `json:"name,omitempty"`
 		ParentID string   `json:"parentId,omitempty"`
@@ -120,6 +124,7 @@ type (
 		Profiles            []Profile `json:"profiles,omitempty"`
 		Record              bool      `json:"record,omitempty"`
 		RecordObjectStoreId string    `json:"recordObjectStoreId,omitempty"`
+		PlaybackPolicy      string    `json:"playbackPolicy,omitempty"`
 	}
 
 	// Profile transcoding profile
@@ -166,9 +171,10 @@ type (
 
 		// These can be present on parent stream objects if they are used to stream
 		// directly to broadcasters (i.e. not using the streamKey through RTMP)
-		RecordingStatus string `json:"recordingStatus,omitempty"` // ready, waiting
-		RecordingURL    string `json:"recordingUrl,omitempty"`
-		Mp4Url          string `json:"mp4Url,omitempty"`
+		RecordingStatus string         `json:"recordingStatus,omitempty"` // ready, waiting
+		RecordingURL    string         `json:"recordingUrl,omitempty"`
+		Mp4Url          string         `json:"mp4Url,omitempty"`
+		PlaybackPolicy  PlaybackPolicy `json:"playbackPolicy,omitempty"`
 	}
 
 	// UserSession user's sessions
