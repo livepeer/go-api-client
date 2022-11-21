@@ -309,6 +309,8 @@ type (
 		CreatedAt     int64       `json:"createdAt"`
 		SourceAssetID string      `json:"sourceAssetId,omitempty"`
 		ObjectStoreID string      `json:"objectStoreId"`
+		DownloadURL   string      `json:"downloadUrl"`
+		PlaybackURL   string      `json:"playbackUrl"`
 		Status        AssetStatus `json:"status"`
 		AssetSpec
 	}
