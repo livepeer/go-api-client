@@ -1026,14 +1026,6 @@ func (lapi *Client) newRequest(method, url string, bodyObj interface{}) (*http.R
 	return req, err
 }
 
-func (lapi *Client) getRequest(url string) *http.Request {
-	req, err := lapi.newRequest("GET", url, nil)
-	if err != nil {
-		glog.Fatal(err)
-	}
-	return req
-}
-
 func (lapi *Client) getJSON(url, resourceType, metricName string, output interface{}) error {
 	return lapi.doRequest("GET", url, resourceType, metricName, nil, output)
 }
