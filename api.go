@@ -1200,7 +1200,7 @@ func (lapi *Client) GetObjectStore(id string) (*ObjectStore, error) {
 	return &os, nil
 }
 
-func Retryable(err error) bool {
+func isRetriable(err error) bool {
 	if err == nil {
 		return false
 	}
@@ -1262,29 +1262,30 @@ func (lapi *Client) getJSON(url, resourceType, metricName string, output interfa
 	return lapi.doRequest("GET", url, resourceType, metricName, nil, output)
 }
 
-// Does a request with retries
 func (lapi *Client) doRequest(method, url, resourceType, metricName string, input, output interface{}) error {
+	_, err := lapi.doRequestHeaders(method, url, resourceType, metricName, input, output)
+	return err
+}
+
+// Does a request with retries
+func (lapi *Client) doRequestHeaders(method, url, resourceType, metricName string, input, output interface{}) (headers http.Header, err error) {
 	backoff := 1 * time.Second
 	for try := 1; try <= 3; try++ {
-		err := lapi.doRequestOnce(method, url, resourceType, metricName, input, output)
-		if Retryable(err) {
+		headers, err = lapi.doRequestHeadersOnce(method, url, resourceType, metricName, input, output)
+		if isRetriable(err) {
 			time.Sleep(backoff)
 			backoff *= 2
 			continue
 		}
 		if err != nil {
-			glog.Errorf("Fatal error calling API /setactive id=%s active=%t err=%v", id, active, err)
+			glog.Errorf("Unretriable error making request method=%s url=%q", method, url)
 		}
-		return err
+		return
 	}
+	return
 }
 
-func (lapi *Client) doRequestOnce(method, url, resourceType, metricName string, input, output interface{}) error {
-	_, err := lapi.doRequestHeaders(method, url, resourceType, metricName, input, output)
-	return err
-}
-
-func (lapi *Client) doRequestHeaders(method, url, resourceType, metricName string, input, output interface{}) (http.Header, error) {
+func (lapi *Client) doRequestHeadersOnce(method, url, resourceType, metricName string, input, output interface{}) (http.Header, error) {
 	if metricName == "" {
 		metricName = strings.ToLower(method + "_" + resourceType)
 	}
