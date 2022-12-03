@@ -1200,6 +1200,17 @@ func (lapi *Client) GetObjectStore(id string) (*ObjectStore, error) {
 	return &os, nil
 }
 
+func Retryable(err error) bool {
+	if err == nil {
+		return false
+	}
+	if Timedout(err) {
+		return true
+	}
+	return Timedout(err) ||
+		strings.HasPrefix(err.Error(), "request failed with status 5") // 5xx status code
+}
+
 func Timedout(err error) bool {
 	if err == nil {
 		return false
@@ -1251,7 +1262,24 @@ func (lapi *Client) getJSON(url, resourceType, metricName string, output interfa
 	return lapi.doRequest("GET", url, resourceType, metricName, nil, output)
 }
 
+// Does a request with retries
 func (lapi *Client) doRequest(method, url, resourceType, metricName string, input, output interface{}) error {
+	backoff := 1 * time.Second
+	for try := 1; try <= 3; try++ {
+		err := lapi.doRequestOnce(method, url, resourceType, metricName, input, output)
+		if Retryable(err) {
+			time.Sleep(backoff)
+			backoff *= 2
+			continue
+		}
+		if err != nil {
+			glog.Errorf("Fatal error calling API /setactive id=%s active=%t err=%v", id, active, err)
+		}
+		return err
+	}
+}
+
+func (lapi *Client) doRequestOnce(method, url, resourceType, metricName string, input, output interface{}) error {
 	_, err := lapi.doRequestHeaders(method, url, resourceType, metricName, input, output)
 	return err
 }
