@@ -752,9 +752,12 @@ func (lapi *Client) getStream(url, metricName string) (*Stream, error) {
 	return stream, nil
 }
 
-func (lapi *Client) GetTask(id string) (*Task, error) {
+func (lapi *Client) GetTask(id string, strongConsistency bool) (*Task, error) {
 	var task Task
 	url := fmt.Sprintf("%s/api/task/%s", lapi.chosenServer, id)
+	if strongConsistency {
+		url += "?strongConsistency=1"
+	}
 	if err := lapi.getJSON(url, "task", "", &task); err != nil {
 		return nil, err
 	}
@@ -897,9 +900,12 @@ func (lapi *Client) GetMultistreamTargetR(id string) (*MultistreamTarget, error)
 	}
 }
 
-func (lapi *Client) GetAsset(id string) (*Asset, error) {
+func (lapi *Client) GetAsset(id string, strongConsistency bool) (*Asset, error) {
 	var asset Asset
 	url := fmt.Sprintf("%s/api/asset/%s", lapi.chosenServer, id)
+	if strongConsistency {
+		url += "?strongConsistency=1"
+	}
 	if err := lapi.getJSON(url, "asset", "", &asset); err != nil {
 		return nil, err
 	}
