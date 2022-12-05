@@ -806,29 +806,28 @@ func (lapi *Client) RequestUpload(name string) (*UploadUrls, error) {
 }
 
 func (lapi *Client) UploadAsset(ctx context.Context, url string, file io.ReadSeeker) error {
-	_, err := doWithRetries(2, isRetriable, func() (*struct{}, error) {
+	return doWithRetries(2, isRetriable, func() error {
 		_, err := file.Seek(0, io.SeekStart)
 		if err != nil {
-			return nil, fmt.Errorf("error seeking to start of file: %w", err)
+			return fmt.Errorf("error seeking to start of file: %w", err)
 		}
 		req, err := http.NewRequestWithContext(ctx, "PUT", url, file)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		startTime := time.Now()
 		resp, err := longTimeoutHTTPClient.Do(req)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		defer resp.Body.Close()
 		if err := checkResponseError(resp); err != nil {
-			return nil, err
+			return err
 		}
 		glog.V(logs.DEBUG).Infof("Uploaded asset to url=%s dur=%v", url, time.Since(startTime))
-		return nil, nil
+		return nil
 	})
-	return err
 }
 
 // Temporary function while waiting for go-api-client to get fixed
@@ -1049,8 +1048,10 @@ func (lapi *Client) doRequest(method, url, resourceType, metricName string, inpu
 
 // Does a request with retries
 func (lapi *Client) doRequestHeaders(method, url, resourceType, metricName string, input, output interface{}) (http.Header, error) {
-	headers, err := doWithRetries(3, isRetriable, func() (http.Header, error) {
-		return lapi.doRequestHeadersOnce(method, url, resourceType, metricName, input, output)
+	var headers http.Header
+	err := doWithRetries(3, isRetriable, func() (err error) {
+		headers, err = lapi.doRequestHeadersOnce(method, url, resourceType, metricName, input, output)
+		return err
 	})
 	if err != nil {
 		glog.Errorf("Post-retries error making request method=%s url=%q err=%q retriable=%v", method, url, err, isRetriable(err))
@@ -1104,9 +1105,12 @@ func (lapi *Client) PushSegmentR(sid string, seqNo int, dur time.Duration, segDa
 		return Timedout(err) ||
 			strings.Contains(errMsg, "could not create stream id")
 	}
-	return doWithRetries(6, shouldRetry, func() ([][]byte, error) {
-		return lapi.PushSegment(sid, seqNo, dur, segData, resolution)
+	var transcoded [][]byte
+	err := doWithRetries(6, shouldRetry, func() (err error) {
+		transcoded, err = lapi.PushSegment(sid, seqNo, dur, segData, resolution)
+		return
 	})
+	return transcoded, err
 }
 
 func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segData []byte, resolution string) ([][]byte, error) {
@@ -1220,10 +1224,10 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 // Calls the action function until no error or an unretriable error is returned,
 // or the maximum number of tries is reached. Retriability is determined by the
 // provided shouldRetry function.
-func doWithRetries[T any](maxTries int, shouldRetry func(error) bool, action func() (T, error)) (res T, err error) {
+func doWithRetries(maxTries int, shouldRetry func(error) bool, action func() error) (err error) {
 	backoff := 1 * time.Second
 	for try := 1; try <= maxTries; try++ {
-		res, err = action()
+		err = action()
 		if err == nil || !shouldRetry(err) {
 			return
 		}
