@@ -890,21 +890,6 @@ func (lapi *Client) GetMultistreamTarget(id string) (*MultistreamTarget, error) 
 	return &target, nil
 }
 
-// GetMultistreamTargetR gets multistream target with retries
-func (lapi *Client) GetMultistreamTargetR(id string) (*MultistreamTarget, error) {
-	var apiTry int
-	for {
-		target, err := lapi.GetMultistreamTarget(id)
-		if err != nil {
-			if Timedout(err) && apiTry < 3 {
-				apiTry++
-				continue
-			}
-		}
-		return target, err
-	}
-}
-
 func (lapi *Client) GetAsset(id string, strongConsistency bool) (*Asset, error) {
 	var asset Asset
 	url := fmt.Sprintf("%s/api/asset/%s", lapi.chosenServer, id)
@@ -1098,8 +1083,8 @@ func (lapi *Client) doRequestHeadersOnce(method, url, resourceType, metricName s
 	return resp.Header, json.Unmarshal(b, output)
 }
 
-// PushSegmentR pushes a segment with retries
-func (lapi *Client) PushSegmentR(sid string, seqNo int, dur time.Duration, segData []byte, resolution string) ([][]byte, error) {
+// PushSegment pushes a segment with retries
+func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segData []byte, resolution string) ([][]byte, error) {
 	shouldRetry := func(err error) bool {
 		errMsg := strings.ToLower(err.Error())
 		return Timedout(err) ||
@@ -1107,13 +1092,13 @@ func (lapi *Client) PushSegmentR(sid string, seqNo int, dur time.Duration, segDa
 	}
 	var transcoded [][]byte
 	err := doWithRetries("push_segment", 6, shouldRetry, func() (err error) {
-		transcoded, err = lapi.PushSegment(sid, seqNo, dur, segData, resolution)
+		transcoded, err = lapi.pushSegmentOnce(sid, seqNo, dur, segData, resolution)
 		return
 	})
 	return transcoded, err
 }
 
-func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segData []byte, resolution string) ([][]byte, error) {
+func (lapi *Client) pushSegmentOnce(sid string, seqNo int, dur time.Duration, segData []byte, resolution string) ([][]byte, error) {
 	var err error
 	if len(lapi.broadcasters) == 0 {
 		lapi.broadcasters, err = lapi.Broadcasters()
