@@ -1042,21 +1042,15 @@ func (lapi *Client) doRequest(method, url, resourceType, metricName string, inpu
 }
 
 // Does a request with retries
-func (lapi *Client) doRequestHeaders(method, url, resourceType, metricName string, input, output interface{}) (headers http.Header, err error) {
-	backoff := 1 * time.Second
-	for try := 1; try <= 3; try++ {
-		headers, err = lapi.doRequestHeadersOnce(method, url, resourceType, metricName, input, output)
-		if isRetriable(err) {
-			time.Sleep(backoff)
-			backoff *= 2
-			continue
-		}
-		if err != nil {
-			glog.Errorf("Unretriable error making request method=%s url=%q", method, url)
-		}
-		return
+func (lapi *Client) doRequestHeaders(method, url, resourceType, metricName string, input, output interface{}) (http.Header, error) {
+	headers, err := doWithRetries(3, isRetriable, func() (http.Header, error) {
+		return lapi.doRequestHeadersOnce(method, url, resourceType, metricName, input, output)
+	})
+	if err != nil {
+		glog.Errorf("Post-retries error making request method=%s url=%q err=%q retriable=%v", method, url, err, isRetriable(err))
+		return nil, err
 	}
-	return
+	return headers, nil
 }
 
 func (lapi *Client) doRequestHeadersOnce(method, url, resourceType, metricName string, input, output interface{}) (http.Header, error) {
@@ -1098,25 +1092,15 @@ func (lapi *Client) doRequestHeadersOnce(method, url, resourceType, metricName s
 }
 
 // PushSegmentR pushes a segment with retries
-func (lapi *Client) PushSegmentR(sid string, seqNo int, dur time.Duration, segData []byte, resolution string) (transcoded [][]byte, err error) {
-	const maxTries = 6
-	backoff := 1 * time.Second
+func (lapi *Client) PushSegmentR(sid string, seqNo int, dur time.Duration, segData []byte, resolution string) ([][]byte, error) {
 	shouldRetry := func(err error) bool {
 		errMsg := strings.ToLower(err.Error())
 		return Timedout(err) ||
 			strings.Contains(errMsg, "could not create stream id")
 	}
-	for try := 1; try <= maxTries; try++ {
-		transcoded, err = lapi.PushSegment(sid, seqNo, dur, segData, resolution)
-		if err == nil || !shouldRetry(err) {
-			return
-		}
-		if try < maxTries {
-			time.Sleep(backoff)
-			backoff *= 2
-		}
-	}
-	return
+	return doWithRetries(6, shouldRetry, func() ([][]byte, error) {
+		return lapi.PushSegment(sid, seqNo, dur, segData, resolution)
+	})
 }
 
 func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segData []byte, resolution string) ([][]byte, error) {
@@ -1225,6 +1209,24 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 		return nil, err
 	}
 	return segments, nil
+}
+
+// Calls the action function until no error or an unretriable error is returned,
+// or the maximum number of tries is reached. Retriability is determined by the
+// provided shouldRetry function.
+func doWithRetries[T any](maxTries int, shouldRetry func(error) bool, action func() (T, error)) (res T, err error) {
+	backoff := 1 * time.Second
+	for try := 1; try <= maxTries; try++ {
+		res, err = action()
+		if err == nil || !shouldRetry(err) {
+			return
+		}
+		if try < maxTries {
+			time.Sleep(backoff)
+			backoff *= 2
+		}
+	}
+	return
 }
 
 func checkResponseError(resp *http.Response) error {
