@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -492,10 +491,10 @@ func GeolocateAPIServer() (string, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		b, _ := ioutil.ReadAll(resp.Body)
+		b, _ := io.ReadAll(resp.Body)
 		return "", fmt.Errorf("status error contacting Livepeer API server (%s) status %d body: %s", livepeerAPIGeolocateURL, resp.StatusCode, string(b))
 	}
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("error geolocating Livepeer API server (%s): %w", livepeerAPIGeolocateURL, err)
 	}
@@ -1076,7 +1075,7 @@ func (lapi *Client) doRequestHeadersOnce(method, url, resourceType, metricName s
 		return resp.Header, err
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		glog.Errorf("Error reading Livepeer API response body resource=%s method=%s url=%s error=%q", resourceType, method, url, err)
 		lapi.metrics.APIRequest(metricName, 0, err)
@@ -1181,7 +1180,7 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 					glog.Infof("Header '%s': '%s'", k, v)
 				}
 			}
-			body, merr := ioutil.ReadAll(p)
+			body, merr := io.ReadAll(p)
 			if merr != nil {
 				glog.Errorf("error reading body manifest=%s seqNo=%d err=%v", sid, seqNo, merr)
 				err = merr
@@ -1233,7 +1232,7 @@ func checkResponseError(resp *http.Response) error {
 	if isSuccessStatus(resp.StatusCode) {
 		return nil
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	glog.V(logs.VERBOSE).Infof("Status error from Livepeer API method=%s url=%s status=%d body=%q", resp.Request.Method, resp.Request.URL, resp.StatusCode, string(body))
 	if err != nil {
 		return fmt.Errorf("failed reading error response (%s): %w", resp.Status, err)
