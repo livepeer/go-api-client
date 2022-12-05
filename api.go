@@ -805,23 +805,30 @@ func (lapi *Client) RequestUpload(name string) (*UploadUrls, error) {
 	return &output, nil
 }
 
-func (lapi *Client) UploadAsset(ctx context.Context, url string, file io.Reader) error {
-	req, err := http.NewRequestWithContext(ctx, "PUT", url, file)
-	if err != nil {
-		return err
-	}
+func (lapi *Client) UploadAsset(ctx context.Context, url string, file io.ReadSeeker) error {
+	_, err := doWithRetries(2, isRetriable, func() (*struct{}, error) {
+		_, err := file.Seek(0, io.SeekStart)
+		if err != nil {
+			return nil, fmt.Errorf("error seeking to start of file: %w", err)
+		}
+		req, err := http.NewRequestWithContext(ctx, "PUT", url, file)
+		if err != nil {
+			return nil, err
+		}
 
-	startTime := time.Now()
-	resp, err := longTimeoutHTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if err := checkResponseError(resp); err != nil {
-		return err
-	}
-	glog.V(logs.DEBUG).Infof("Uploaded asset to url=%s dur=%v", url, time.Since(startTime))
-	return nil
+		startTime := time.Now()
+		resp, err := longTimeoutHTTPClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+		if err := checkResponseError(resp); err != nil {
+			return nil, err
+		}
+		glog.V(logs.DEBUG).Infof("Uploaded asset to url=%s dur=%v", url, time.Since(startTime))
+		return nil, nil
+	})
+	return err
 }
 
 // Temporary function while waiting for go-api-client to get fixed
