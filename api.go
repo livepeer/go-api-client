@@ -806,7 +806,7 @@ func (lapi *Client) RequestUpload(name string) (*UploadUrls, error) {
 }
 
 func (lapi *Client) UploadAsset(ctx context.Context, url string, file io.ReadSeeker) error {
-	return doWithRetries(2, isRetriable, func() error {
+	return doWithRetries("upload_asset", 2, isRetriable, func() error {
 		_, err := file.Seek(0, io.SeekStart)
 		if err != nil {
 			return fmt.Errorf("error seeking to start of file: %w", err)
@@ -1049,7 +1049,7 @@ func (lapi *Client) doRequest(method, url, resourceType, metricName string, inpu
 // Does a request with retries
 func (lapi *Client) doRequestHeaders(method, url, resourceType, metricName string, input, output interface{}) (http.Header, error) {
 	var headers http.Header
-	err := doWithRetries(3, isRetriable, func() (err error) {
+	err := doWithRetries(metricName, 3, isRetriable, func() (err error) {
 		headers, err = lapi.doRequestHeadersOnce(method, url, resourceType, metricName, input, output)
 		return err
 	})
@@ -1106,7 +1106,7 @@ func (lapi *Client) PushSegmentR(sid string, seqNo int, dur time.Duration, segDa
 			strings.Contains(errMsg, "could not create stream id")
 	}
 	var transcoded [][]byte
-	err := doWithRetries(6, shouldRetry, func() (err error) {
+	err := doWithRetries("push_segment", 6, shouldRetry, func() (err error) {
 		transcoded, err = lapi.PushSegment(sid, seqNo, dur, segData, resolution)
 		return
 	})
@@ -1224,7 +1224,7 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 // Calls the action function until no error or an unretriable error is returned,
 // or the maximum number of tries is reached. Retriability is determined by the
 // provided shouldRetry function.
-func doWithRetries(maxTries int, shouldRetry func(error) bool, action func() error) (err error) {
+func doWithRetries(apiName string, maxTries int, shouldRetry func(error) bool, action func() error) (err error) {
 	backoff := 1 * time.Second
 	for try := 1; try <= maxTries; try++ {
 		err = action()
@@ -1232,6 +1232,7 @@ func doWithRetries(maxTries int, shouldRetry func(error) bool, action func() err
 			return
 		}
 		if try < maxTries {
+			glog.Infof("Retrying API due to error api=%s try=%d err=%v ", apiName, try, err)
 			time.Sleep(backoff)
 			backoff *= 2
 		}
