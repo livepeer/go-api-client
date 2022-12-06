@@ -1032,6 +1032,9 @@ func (lapi *Client) doRequest(method, url, resourceType, metricName string, inpu
 
 // Does a request with retries
 func (lapi *Client) doRequestHeaders(method, url, resourceType, metricName string, input, output interface{}) (http.Header, error) {
+	if metricName == "" {
+		metricName = strings.ToLower(method + "_" + resourceType)
+	}
 	var headers http.Header
 	err := doWithRetries(metricName, 3, isRetriable, func() (err error) {
 		headers, err = lapi.doRequestHeadersOnce(method, url, resourceType, metricName, input, output)
@@ -1045,9 +1048,6 @@ func (lapi *Client) doRequestHeaders(method, url, resourceType, metricName strin
 }
 
 func (lapi *Client) doRequestHeadersOnce(method, url, resourceType, metricName string, input, output interface{}) (http.Header, error) {
-	if metricName == "" {
-		metricName = strings.ToLower(method + "_" + resourceType)
-	}
 	start := time.Now()
 	req, err := lapi.newRequest(method, url, input)
 	if err != nil {
@@ -1216,7 +1216,7 @@ func doWithRetries(apiName string, maxTries int, shouldRetry func(error) bool, a
 			return
 		}
 		if try < maxTries {
-			glog.Infof("Retrying API due to error api=%s try=%d err=%v ", apiName, try, err)
+			glog.Infof("Retrying API due to error after backoff=%v api=%s try=%d err=%q", backoff, apiName, try, err)
 			time.Sleep(backoff)
 			backoff *= 2
 		}
