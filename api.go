@@ -31,10 +31,12 @@ const (
 	INSANE2  = 14
 )
 
-// ErrNotExists returned if receives a 404 error from the API
-var ErrNotExists = errors.New("not found")
-
-const setActiveTimeout = 1500 * time.Millisecond
+var (
+	// ErrNotExists returned if receives a 404 error from the API
+	ErrNotExists = errors.New("not found")
+	// ErrRateLimited returned if receives a 429 error from the API
+	ErrRateLimited = errors.New("rate limited")
+)
 
 var defaultHTTPClient = &http.Client{
 	Timeout: 4 * time.Second,
@@ -1236,6 +1238,8 @@ func checkResponseError(resp *http.Response) error {
 	}
 	if resp.StatusCode == http.StatusNotFound {
 		return ErrNotExists
+	} else if resp.StatusCode == http.StatusTooManyRequests {
+		return ErrRateLimited
 	}
 	var errResp struct {
 		Errors []string `json:"errors"`
