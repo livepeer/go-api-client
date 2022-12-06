@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -32,10 +31,12 @@ const (
 	INSANE2  = 14
 )
 
-// ErrNotExists returned if receives a 404 error from the API
-var ErrNotExists = errors.New("not found")
-
-const setActiveTimeout = 1500 * time.Millisecond
+var (
+	// ErrNotExists returned if receives a 404 error from the API
+	ErrNotExists = errors.New("not found")
+	// ErrRateLimited returned if receives a 429 error from the API
+	ErrRateLimited = errors.New("rate limited")
+)
 
 var defaultHTTPClient = &http.Client{
 	Timeout: 4 * time.Second,
@@ -492,10 +493,10 @@ func GeolocateAPIServer() (string, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		b, _ := ioutil.ReadAll(resp.Body)
+		b, _ := io.ReadAll(resp.Body)
 		return "", fmt.Errorf("status error contacting Livepeer API server (%s) status %d body: %s", livepeerAPIGeolocateURL, resp.StatusCode, string(b))
 	}
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("error geolocating Livepeer API server (%s): %w", livepeerAPIGeolocateURL, err)
 	}
@@ -525,31 +526,17 @@ func (lapi *Client) GetServer() string {
 // Broadcasters returns list of hostnames of broadcasters to use
 func (lapi *Client) Broadcasters() ([]string, error) {
 	u := fmt.Sprintf("%s/api/broadcaster", lapi.chosenServer)
-	resp, err := lapi.httpClient.Do(lapi.getRequest(u))
+	var broadcasters []addressResp
+	err := lapi.getJSON(u, "broadcaster", "", &broadcasters)
 	if err != nil {
 		glog.Errorf("Error getting broadcasters from Livepeer API server (%s) error: %v", u, err)
 		return nil, err
 	}
-	if resp.StatusCode != http.StatusOK {
-		b, _ := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		glog.Fatalf("Status error contacting Livepeer API server (%s) status %d body: %s", livepeerAPIGeolocateURL, resp.StatusCode, string(b))
-	}
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		glog.Fatalf("Error geolocating Livepeer API server (%s) error: %v", livepeerAPIGeolocateURL, err)
-	}
-	glog.Info(string(b))
-	broadcasters := []addressResp{}
-	err = json.Unmarshal(b, &broadcasters)
-	if err != nil {
-		return nil, err
-	}
-	bs := make([]string, 0, len(broadcasters))
+	addresses := make([]string, 0, len(broadcasters))
 	for _, a := range broadcasters {
-		bs = append(bs, a.Address)
+		addresses = append(addresses, a.Address)
 	}
-	return bs, nil
+	return addresses, nil
 }
 
 // Ingest object
@@ -565,24 +552,10 @@ func (lapi *Client) Ingest(all bool) ([]Ingest, error) {
 	if all {
 		u += "?first=false"
 	}
-	resp, err := lapi.httpClient.Do(lapi.getRequest(u))
+	var ingests []Ingest
+	err := lapi.getJSON(u, "ingest", "", &ingests)
 	if err != nil {
 		glog.Errorf("Error getting ingests from Livepeer API server (%s) error: %v", u, err)
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		b, _ := ioutil.ReadAll(resp.Body)
-		glog.Fatalf("Status error contacting Livepeer API server (%s) status %d body: %s", lapi.chosenServer, resp.StatusCode, string(b))
-	}
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		glog.Fatalf("Error reading from Livepeer API server (%s) error: %v", lapi.chosenServer, err)
-	}
-	glog.Info(string(b))
-	ingests := []Ingest{}
-	err = json.Unmarshal(b, &ingests)
-	if err != nil {
 		return nil, err
 	}
 	return ingests, nil
@@ -627,44 +600,13 @@ var StandardProfiles = []Profile{
 func (lapi *Client) DeleteStream(id string) error {
 	glog.V(logs.DEBUG).Infof("Deleting Livepeer stream '%s' ", id)
 	u := fmt.Sprintf("%s/api/stream/%s", lapi.chosenServer, id)
-	req, err := lapi.newRequest("DELETE", u, nil)
-	if err != nil {
-		return err
-	}
-	resp, err := lapi.httpClient.Do(req)
-	if err != nil {
-		glog.Errorf("Error deleting Livepeer stream %v", err)
-		return err
-	}
-	defer resp.Body.Close()
-	_, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		glog.Errorf("Error deleting Livepeer stream (body) %v", err)
-		return err
-	}
-	if resp.StatusCode != 204 {
-		return fmt.Errorf("error deleting stream %s: status is %s", id, resp.Status)
-	}
-	return nil
+	err := lapi.doRequest("DELETE", u, "stream", "", nil, nil)
+	return err
 }
 
 // CreateStreamEx creates stream with specified name and profiles
 func (lapi *Client) CreateStreamEx(name string, record bool, presets []string, profiles ...Profile) (*Stream, error) {
 	return lapi.CreateStream(CreateStreamReq{Name: name, Record: record, Presets: presets, Profiles: profiles})
-}
-
-// CreateStreamR creates a stream with retries
-func (lapi *Client) CreateStreamR(csr CreateStreamReq) (stream *Stream, err error) {
-	for try := 1; try <= 3; try++ {
-		stream, err = lapi.CreateStream(csr)
-		if err == nil || !Timedout(err) {
-			return
-		}
-		if try < 3 {
-			time.Sleep(time.Duration(try) * time.Second)
-		}
-	}
-	return
 }
 
 // CreateStream creates stream with specified name and profiles
@@ -680,23 +622,10 @@ func (lapi *Client) CreateStream(csr CreateStreamReq) (*Stream, error) {
 	if csr.ParentID != "" {
 		u = fmt.Sprintf("%s/api/stream/%s/stream", lapi.chosenServer, csr.ParentID)
 	}
-	req, err := lapi.newRequest("POST", u, csr)
-	if err != nil {
-		return nil, err
-	}
-	httpResp, err := lapi.httpClient.Do(req)
-	if err != nil {
-		glog.Errorf("Error creating stream err=%+v", err)
-		return nil, err
-	}
-	defer httpResp.Body.Close()
-
-	if err := checkResponseError(httpResp); err != nil {
-		return nil, fmt.Errorf("error creating stream: %w", err)
-	}
 	var stream *Stream
-	if err = json.NewDecoder(httpResp.Body).Decode(&stream); err != nil {
-		return nil, fmt.Errorf("error parsing create stream response: %w", err)
+	err := lapi.doRequest("POST", u, "stream", "", csr, &stream)
+	if err != nil {
+		return nil, err
 	}
 	glog.Infof("Created stream name=%q id=%s", csr.Name, stream.ID)
 	return stream, nil
@@ -737,36 +666,6 @@ func (lapi *Client) GetStream(id string, forceRecordingUrl bool) (*Stream, error
 	return lapi.getStream(u, "get_by_id")
 }
 
-// GetSessionsR gets user's sessions for the stream by id
-func (lapi *Client) GetSessionsR(id string, forceUrl bool) ([]UserSession, error) {
-	var apiTry int
-	for {
-		sessions, err := lapi.GetSessions(id, forceUrl)
-		if err != nil {
-			if Timedout(err) && apiTry < 3 {
-				apiTry++
-				continue
-			}
-		}
-		return sessions, err
-	}
-}
-
-// GetSessionsNewR gets user's sessions for the stream by id
-func (lapi *Client) GetSessionsNewR(id string, forceUrl bool) ([]UserSession, error) {
-	var apiTry int
-	for {
-		sessions, err := lapi.GetSessionsNew(id, forceUrl)
-		if err != nil {
-			if Timedout(err) && apiTry < 3 {
-				apiTry++
-				continue
-			}
-		}
-		return sessions, err
-	}
-}
-
 func (lapi *Client) GetSessionsNew(id string, forceUrl bool) ([]UserSession, error) {
 	if id == "" {
 		return nil, errors.New("empty id")
@@ -775,43 +674,13 @@ func (lapi *Client) GetSessionsNew(id string, forceUrl bool) ([]UserSession, err
 	if forceUrl {
 		u += "&forceUrl=1"
 	}
-	start := time.Now()
-	req := lapi.getRequest(u)
-	resp, err := lapi.httpClient.Do(req)
+	var sessions []UserSession
+	err := lapi.getJSON(u, "session", "list_sessions", &sessions)
 	if err != nil {
 		glog.Errorf("Error getting sessions for stream by id from Livepeer API server (%s) error: %v", u, err)
 		return nil, err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		b, _ := ioutil.ReadAll(resp.Body)
-		glog.Errorf("Status error getting sessions for stream by id Livepeer API server (%s) status %d body: %s", u, resp.StatusCode, string(b))
-		if resp.StatusCode == http.StatusNotFound {
-			return nil, ErrNotExists
-		}
-		err := errors.New(http.StatusText(resp.StatusCode))
-		return nil, err
-	}
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		glog.Errorf("Error getting sessions for stream by id Livepeer API server (%s) error: %v", u, err)
-		return nil, err
-	}
-	took := time.Since(start)
-	glog.V(logs.DEBUG).Infof("sessions request for id=%s took=%s", id, took)
-	bs := string(b)
-	glog.Info(bs)
-	glog.V(logs.VERBOSE).Info(bs)
-	if bs == "null" || bs == "" {
-		// API return null if stream does not exists
-		return nil, ErrNotExists
-	}
-	r := []UserSession{}
-	err = json.Unmarshal(b, &r)
-	if err != nil {
-		return nil, err
-	}
-	return r, nil
+	return sessions, nil
 }
 
 // GetSessions gets user's sessions for the stream by id
@@ -823,101 +692,37 @@ func (lapi *Client) GetSessions(id string, forceUrl bool) ([]UserSession, error)
 	if forceUrl {
 		u += "?forceUrl=1"
 	}
-	start := time.Now()
-	req := lapi.getRequest(u)
-	resp, err := lapi.httpClient.Do(req)
+
+	var sessions []UserSession
+	err := lapi.getJSON(u, "stream", "list_child_streams", &sessions)
 	if err != nil {
 		glog.Errorf("Error getting sessions for stream by id from Livepeer API server (%s) error: %v", u, err)
 		return nil, err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		b, _ := ioutil.ReadAll(resp.Body)
-		glog.Errorf("Status error getting sessions for stream by id Livepeer API server (%s) status %d body: %s", u, resp.StatusCode, string(b))
-		if resp.StatusCode == http.StatusNotFound {
-			return nil, ErrNotExists
-		}
-		err := errors.New(http.StatusText(resp.StatusCode))
-		return nil, err
-	}
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		glog.Errorf("Error getting sessions for stream by id Livepeer API server (%s) error: %v", u, err)
-		return nil, err
-	}
-	took := time.Since(start)
-	glog.V(logs.DEBUG).Infof("sessions request for id=%s took=%s", id, took)
-	bs := string(b)
-	glog.V(logs.VERBOSE).Info(bs)
-	if bs == "null" || bs == "" {
-		// API return null if stream does not exists
-		return nil, ErrNotExists
-	}
-	r := []UserSession{}
-	err = json.Unmarshal(b, &r)
-	if err != nil {
-		return nil, err
-	}
-	return r, nil
-}
-
-// SetActiveR sets stream active with retries
-func (lapi *Client) SetActiveR(id string, active bool, startedAt time.Time) (bool, error) {
-	apiTry := 1
-	for {
-		ok, err := lapi.SetActive(id, active, startedAt)
-		if err != nil {
-			if Timedout(err) && apiTry < 3 {
-				apiTry++
-				continue
-			}
-			glog.Errorf("Fatal error calling API /setactive id=%s active=%t err=%v", id, active, err)
-		}
-		return ok, err
-	}
+	return sessions, nil
 }
 
 // SetActive set isActive
 func (lapi *Client) SetActive(id string, active bool, startedAt time.Time) (bool, error) {
 	if id == "" {
-		return true, errors.New("empty id")
+		return false, errors.New("empty id")
 	}
-	start := time.Now()
 	u := fmt.Sprintf("%s/api/stream/%s/setactive", lapi.chosenServer, id)
-	ar := setActiveReq{
+	req := setActiveReq{
 		Active:   active,
 		HostName: hostName,
 	}
 	if !startedAt.IsZero() {
-		ar.StartedAt = startedAt.UnixNano() / int64(time.Millisecond)
+		req.StartedAt = startedAt.UnixNano() / int64(time.Millisecond)
 	}
-	req, err := lapi.newRequest("PUT", u, &ar)
+	var res json.RawMessage
+	err := lapi.doRequest("PUT", u, "stream", "set_active", req, &res)
+	glog.Infof("Ran setactive request id=%s request=%+v response=%q error=%q", id, req, res, err)
 	if err != nil {
 		lapi.metrics.APIRequest("set_active", 0, err)
-		return true, err
+		return false, err
 	}
-	ctx, cancel := context.WithTimeout(req.Context(), setActiveTimeout)
-	defer cancel()
-	req = req.WithContext(ctx)
-
-	resp, err := lapi.httpClient.Do(req)
-	if err != nil {
-		glog.Errorf("id=%s/setactive Error set active %v", id, err)
-		lapi.metrics.APIRequest("set_active", 0, err)
-		return true, err
-	}
-	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		glog.Errorf("id=%s/setactive Error set active (body) %v", id, err)
-		lapi.metrics.APIRequest("set_active", 0, err)
-		return true, err
-	}
-	took := time.Since(start)
-	lapi.metrics.APIRequest("set_active", took, nil)
-	glog.Infof("%s/setactive took=%s response status code %d status %s resp %+v body=%s",
-		id, took, resp.StatusCode, resp.Status, resp, string(b))
-	return isSuccessStatus(resp.StatusCode), nil
+	return true, nil
 }
 
 // DeactivateMany sets many streams isActive field to false
@@ -925,44 +730,16 @@ func (lapi *Client) DeactivateMany(ids []string) (int, error) {
 	if len(ids) == 0 {
 		return 0, errors.New("empty ids")
 	}
-	start := time.Now()
 	u := fmt.Sprintf("%s/api/stream/deactivate-many", lapi.chosenServer)
-	dmreq := deactivateManyReq{
+	req := deactivateManyReq{
 		IDS: ids,
 	}
-	req, err := lapi.newRequest("PATCH", u, &dmreq)
-	if err != nil {
-		lapi.metrics.APIRequest("deactivate-many", 0, err)
-		return 0, err
-	}
-	resp, err := lapi.httpClient.Do(req)
-	if err != nil {
-		glog.Errorf("/deactivate-many err=%v", err)
-		lapi.metrics.APIRequest("set_active", 0, err)
-		return 0, err
-	}
-	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		glog.Errorf("deactivate-many body err=%v", err)
-		lapi.metrics.APIRequest("deactivate-many", 0, err)
-		return 0, err
-	}
-	took := time.Since(start)
-	lapi.metrics.APIRequest("deactivate-many", took, nil)
-	glog.Infof("deactivate-many took=%s response status code %d status %s resp %+v body=%s",
-		took, resp.StatusCode, resp.Status, resp, string(b))
-	if !isSuccessStatus(resp.StatusCode) {
-		return 0, fmt.Errorf("invalid status code: %d", resp.StatusCode)
-	}
-
-	mr := &deactivateManyResp{}
-	err = json.Unmarshal(b, mr)
+	var res deactivateManyResp
+	err := lapi.doRequest("PATCH", u, "stream", "deactivate_many", req, &res)
 	if err != nil {
 		return 0, err
 	}
-
-	return mr.RowCount, nil
+	return res.RowCount, nil
 }
 
 func (lapi *Client) getStream(url, metricName string) (*Stream, error) {
@@ -976,9 +753,12 @@ func (lapi *Client) getStream(url, metricName string) (*Stream, error) {
 	return stream, nil
 }
 
-func (lapi *Client) GetTask(id string) (*Task, error) {
+func (lapi *Client) GetTask(id string, strongConsistency bool) (*Task, error) {
 	var task Task
 	url := fmt.Sprintf("%s/api/task/%s", lapi.chosenServer, id)
+	if strongConsistency {
+		url += "?strongConsistency=1"
+	}
 	if err := lapi.getJSON(url, "task", "", &task); err != nil {
 		return nil, err
 	}
@@ -1027,23 +807,29 @@ func (lapi *Client) RequestUpload(name string) (*UploadUrls, error) {
 	return &output, nil
 }
 
-func (lapi *Client) UploadAsset(ctx context.Context, url string, file io.Reader) error {
-	req, err := http.NewRequestWithContext(ctx, "PUT", url, file)
-	if err != nil {
-		return err
-	}
+func (lapi *Client) UploadAsset(ctx context.Context, url string, file io.ReadSeeker) error {
+	return doWithRetries("upload_asset", 2, isRetriable, func() error {
+		_, err := file.Seek(0, io.SeekStart)
+		if err != nil {
+			return fmt.Errorf("error seeking to start of file: %w", err)
+		}
+		req, err := http.NewRequestWithContext(ctx, "PUT", url, file)
+		if err != nil {
+			return err
+		}
 
-	startTime := time.Now()
-	resp, err := longTimeoutHTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if err := checkResponseError(resp); err != nil {
-		return err
-	}
-	glog.V(logs.DEBUG).Infof("Uploaded asset to url=%s dur=%v", url, time.Since(startTime))
-	return nil
+		startTime := time.Now()
+		resp, err := longTimeoutHTTPClient.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		if err := checkResponseError(resp); err != nil {
+			return err
+		}
+		glog.V(logs.DEBUG).Infof("Uploaded asset to url=%s dur=%v", url, time.Since(startTime))
+		return nil
+	})
 }
 
 // Temporary function while waiting for go-api-client to get fixed
@@ -1106,24 +892,12 @@ func (lapi *Client) GetMultistreamTarget(id string) (*MultistreamTarget, error) 
 	return &target, nil
 }
 
-// GetMultistreamTargetR gets multistream target with retries
-func (lapi *Client) GetMultistreamTargetR(id string) (*MultistreamTarget, error) {
-	var apiTry int
-	for {
-		target, err := lapi.GetMultistreamTarget(id)
-		if err != nil {
-			if Timedout(err) && apiTry < 3 {
-				apiTry++
-				continue
-			}
-		}
-		return target, err
-	}
-}
-
-func (lapi *Client) GetAsset(id string) (*Asset, error) {
+func (lapi *Client) GetAsset(id string, strongConsistency bool) (*Asset, error) {
 	var asset Asset
 	url := fmt.Sprintf("%s/api/asset/%s", lapi.chosenServer, id)
+	if strongConsistency {
+		url += "?strongConsistency=1"
+	}
 	if err := lapi.getJSON(url, "asset", "", &asset); err != nil {
 		return nil, err
 	}
@@ -1200,6 +974,14 @@ func (lapi *Client) GetObjectStore(id string) (*ObjectStore, error) {
 	return &os, nil
 }
 
+func isRetriable(err error) bool {
+	if err == nil {
+		return false
+	}
+	return Timedout(err) ||
+		strings.HasPrefix(err.Error(), "request failed with status 5") // 5xx status code
+}
+
 func Timedout(err error) bool {
 	if err == nil {
 		return false
@@ -1239,14 +1021,6 @@ func (lapi *Client) newRequest(method, url string, bodyObj interface{}) (*http.R
 	return req, err
 }
 
-func (lapi *Client) getRequest(url string) *http.Request {
-	req, err := lapi.newRequest("GET", url, nil)
-	if err != nil {
-		glog.Fatal(err)
-	}
-	return req
-}
-
 func (lapi *Client) getJSON(url, resourceType, metricName string, output interface{}) error {
 	return lapi.doRequest("GET", url, resourceType, metricName, nil, output)
 }
@@ -1256,7 +1030,21 @@ func (lapi *Client) doRequest(method, url, resourceType, metricName string, inpu
 	return err
 }
 
+// Does a request with retries
 func (lapi *Client) doRequestHeaders(method, url, resourceType, metricName string, input, output interface{}) (http.Header, error) {
+	var headers http.Header
+	err := doWithRetries(metricName, 3, isRetriable, func() (err error) {
+		headers, err = lapi.doRequestHeadersOnce(method, url, resourceType, metricName, input, output)
+		return err
+	})
+	if err != nil {
+		glog.Errorf("Post-retries error making request method=%s url=%q err=%q retriable=%v", method, url, err, isRetriable(err))
+		return nil, err
+	}
+	return headers, nil
+}
+
+func (lapi *Client) doRequestHeadersOnce(method, url, resourceType, metricName string, input, output interface{}) (http.Header, error) {
 	if metricName == "" {
 		metricName = strings.ToLower(method + "_" + resourceType)
 	}
@@ -1279,7 +1067,7 @@ func (lapi *Client) doRequestHeaders(method, url, resourceType, metricName strin
 		return resp.Header, err
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		glog.Errorf("Error reading Livepeer API response body resource=%s method=%s url=%s error=%q", resourceType, method, url, err)
 		lapi.metrics.APIRequest(metricName, 0, err)
@@ -1294,29 +1082,22 @@ func (lapi *Client) doRequestHeaders(method, url, resourceType, metricName strin
 	return resp.Header, json.Unmarshal(b, output)
 }
 
-// PushSegmentR pushes a segment with retries
-func (lapi *Client) PushSegmentR(sid string, seqNo int, dur time.Duration, segData []byte, resolution string) (transcoded [][]byte, err error) {
-	const maxTries = 6
-	backoff := 1 * time.Second
+// PushSegment pushes a segment with retries
+func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segData []byte, resolution string) ([][]byte, error) {
 	shouldRetry := func(err error) bool {
 		errMsg := strings.ToLower(err.Error())
 		return Timedout(err) ||
 			strings.Contains(errMsg, "could not create stream id")
 	}
-	for try := 1; try <= maxTries; try++ {
-		transcoded, err = lapi.PushSegment(sid, seqNo, dur, segData, resolution)
-		if err == nil || !shouldRetry(err) {
-			return
-		}
-		if try < maxTries {
-			time.Sleep(backoff)
-			backoff *= 2
-		}
-	}
-	return
+	var transcoded [][]byte
+	err := doWithRetries("push_segment", 6, shouldRetry, func() (err error) {
+		transcoded, err = lapi.pushSegmentOnce(sid, seqNo, dur, segData, resolution)
+		return
+	})
+	return transcoded, err
 }
 
-func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segData []byte, resolution string) ([][]byte, error) {
+func (lapi *Client) pushSegmentOnce(sid string, seqNo int, dur time.Duration, segData []byte, resolution string) ([][]byte, error) {
 	var err error
 	if len(lapi.broadcasters) == 0 {
 		lapi.broadcasters, err = lapi.Broadcasters()
@@ -1394,7 +1175,7 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 					glog.Infof("Header '%s': '%s'", k, v)
 				}
 			}
-			body, merr := ioutil.ReadAll(p)
+			body, merr := io.ReadAll(p)
 			if merr != nil {
 				glog.Errorf("error reading body manifest=%s seqNo=%d err=%v", sid, seqNo, merr)
 				err = merr
@@ -1424,17 +1205,38 @@ func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segDat
 	return segments, nil
 }
 
+// Calls the action function until no error or an unretriable error is returned,
+// or the maximum number of tries is reached. Retriability is determined by the
+// provided shouldRetry function.
+func doWithRetries(apiName string, maxTries int, shouldRetry func(error) bool, action func() error) (err error) {
+	backoff := 1 * time.Second
+	for try := 1; try <= maxTries; try++ {
+		err = action()
+		if err == nil || !shouldRetry(err) {
+			return
+		}
+		if try < maxTries {
+			glog.Infof("Retrying API due to error api=%s try=%d err=%v ", apiName, try, err)
+			time.Sleep(backoff)
+			backoff *= 2
+		}
+	}
+	return
+}
+
 func checkResponseError(resp *http.Response) error {
 	if isSuccessStatus(resp.StatusCode) {
 		return nil
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	glog.V(logs.VERBOSE).Infof("Status error from Livepeer API method=%s url=%s status=%d body=%q", resp.Request.Method, resp.Request.URL, resp.StatusCode, string(body))
 	if err != nil {
 		return fmt.Errorf("failed reading error response (%s): %w", resp.Status, err)
 	}
 	if resp.StatusCode == http.StatusNotFound {
 		return ErrNotExists
+	} else if resp.StatusCode == http.StatusTooManyRequests {
+		return ErrRateLimited
 	}
 	var errResp struct {
 		Errors []string `json:"errors"`
