@@ -978,9 +978,6 @@ func isRetriable(err error) bool {
 	if err == nil {
 		return false
 	}
-	if Timedout(err) {
-		return true
-	}
 	return Timedout(err) ||
 		strings.HasPrefix(err.Error(), "request failed with status 5") // 5xx status code
 }
