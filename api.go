@@ -975,51 +975,6 @@ func (lapi *Client) GetObjectStore(id string) (*ObjectStore, error) {
 	return &os, nil
 }
 
-func isRetriable(err error) bool {
-	if err == nil {
-		return false
-	}
-	return isTimeout(err) ||
-		isTemporaryNetErr(err) ||
-		strings.HasPrefix(err.Error(), "request failed with status 5") // 5xx status code
-}
-
-func isTimeout(err error) bool {
-	if err == nil {
-		return false
-	}
-	var terr interface {
-		Timeout() bool
-	}
-	if errors.As(err, &terr) && terr.Timeout() {
-		return true
-	}
-	errMsg := strings.ToLower(err.Error())
-	return errors.Is(err, syscall.ETIMEDOUT) ||
-		strings.Contains(errMsg, "client.timeout") ||
-		strings.Contains(errMsg, "context canceled") ||
-		strings.Contains(errMsg, "context deadline exceeded")
-}
-
-func isTemporaryNetErr(err error) bool {
-	if err == nil {
-		return false
-	}
-	var terr interface {
-		Temporary() bool
-	}
-	if errors.As(err, &terr) && terr.Temporary() {
-		return true
-	}
-	errMsg := strings.ToLower(err.Error())
-	return errors.Is(err, syscall.ECONNRESET) ||
-		errors.Is(err, syscall.ECONNABORTED) ||
-		errors.Is(err, syscall.ENETRESET) ||
-		errors.Is(err, syscall.EPIPE) ||
-		strings.Contains(errMsg, "connection timed out") ||
-		strings.Contains(errMsg, "network is down")
-}
-
 func (lapi *Client) newRequest(method, url string, bodyObj interface{}) (*http.Request, error) {
 	var body io.Reader
 	if bodyObj != nil {
@@ -1244,6 +1199,51 @@ func doWithRetries(apiName string, maxTries int, shouldRetry func(error) bool, a
 		}
 	}
 	return
+}
+
+func isRetriable(err error) bool {
+	if err == nil {
+		return false
+	}
+	return isTimeout(err) ||
+		isTemporaryNetErr(err) ||
+		strings.HasPrefix(err.Error(), "request failed with status 5") // 5xx status code
+}
+
+func isTimeout(err error) bool {
+	if err == nil {
+		return false
+	}
+	var terr interface {
+		Timeout() bool
+	}
+	if errors.As(err, &terr) && terr.Timeout() {
+		return true
+	}
+	errMsg := strings.ToLower(err.Error())
+	return errors.Is(err, syscall.ETIMEDOUT) ||
+		strings.Contains(errMsg, "client.timeout") ||
+		strings.Contains(errMsg, "context canceled") ||
+		strings.Contains(errMsg, "context deadline exceeded")
+}
+
+func isTemporaryNetErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	var terr interface {
+		Temporary() bool
+	}
+	if errors.As(err, &terr) && terr.Temporary() {
+		return true
+	}
+	errMsg := strings.ToLower(err.Error())
+	return errors.Is(err, syscall.ECONNRESET) ||
+		errors.Is(err, syscall.ECONNABORTED) ||
+		errors.Is(err, syscall.ENETRESET) ||
+		errors.Is(err, syscall.EPIPE) ||
+		strings.Contains(errMsg, "connection timed out") ||
+		strings.Contains(errMsg, "network is down")
 }
 
 func checkResponseError(resp *http.Response) error {
