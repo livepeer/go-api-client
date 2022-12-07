@@ -228,9 +228,10 @@ type (
 	}
 
 	UploadTaskParams struct {
-		URL               string `json:"url,omitempty"`
-		RecordedSessionID string `json:"recordedSessionId,omitempty"`
-		UploadedObjectKey string `json:"uploadedObjectKey,omitempty"`
+		URL                      string `json:"url,omitempty"`
+		RecordedSessionID        string `json:"recordedSessionId,omitempty"`
+		UploadedObjectKey        string `json:"uploadedObjectKey,omitempty"`
+		CatalystPipelineStrategy string `json:"catalystPipelineStrategy,omitempty"`
 	}
 
 	ExportTaskParams struct {
