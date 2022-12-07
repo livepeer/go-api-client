@@ -13,6 +13,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/eventials/go-tus"
@@ -978,11 +979,12 @@ func isRetriable(err error) bool {
 	if err == nil {
 		return false
 	}
-	return Timedout(err) ||
+	return isTimeout(err) ||
+		isTemporaryNetErr(err) ||
 		strings.HasPrefix(err.Error(), "request failed with status 5") // 5xx status code
 }
 
-func Timedout(err error) bool {
+func isTimeout(err error) bool {
 	if err == nil {
 		return false
 	}
@@ -993,9 +995,29 @@ func Timedout(err error) bool {
 		return true
 	}
 	errMsg := strings.ToLower(err.Error())
-	return strings.Contains(errMsg, "client.timeout") ||
+	return errors.Is(err, syscall.ETIMEDOUT) ||
+		strings.Contains(errMsg, "client.timeout") ||
 		strings.Contains(errMsg, "context canceled") ||
 		strings.Contains(errMsg, "context deadline exceeded")
+}
+
+func isTemporaryNetErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	var terr interface {
+		Temporary() bool
+	}
+	if errors.As(err, &terr) && terr.Temporary() {
+		return true
+	}
+	errMsg := strings.ToLower(err.Error())
+	return errors.Is(err, syscall.ECONNRESET) ||
+		errors.Is(err, syscall.ECONNABORTED) ||
+		errors.Is(err, syscall.ENETRESET) ||
+		errors.Is(err, syscall.EPIPE) ||
+		strings.Contains(errMsg, "connection timed out") ||
+		strings.Contains(errMsg, "network is down")
 }
 
 func (lapi *Client) newRequest(method, url string, bodyObj interface{}) (*http.Request, error) {
@@ -1086,7 +1108,7 @@ func (lapi *Client) doRequestHeadersOnce(method, url, resourceType, metricName s
 func (lapi *Client) PushSegment(sid string, seqNo int, dur time.Duration, segData []byte, resolution string) ([][]byte, error) {
 	shouldRetry := func(err error) bool {
 		errMsg := strings.ToLower(err.Error())
-		return Timedout(err) ||
+		return isRetriable(err) ||
 			strings.Contains(errMsg, "could not create stream id")
 	}
 	var transcoded [][]byte
@@ -1132,7 +1154,7 @@ func (lapi *Client) pushSegmentOnce(sid string, seqNo int, dur time.Duration, se
 		defer resp.Body.Close()
 	}
 	glog.V(DEBUG).Infof("Post segment manifest=%s seqNo=%d dur=%s took=%s timed_out=%v status='%v' err=%v",
-		sid, seqNo, dur, postTook, Timedout(err), status, err)
+		sid, seqNo, dur, postTook, isTimeout(err), status, err)
 	if err != nil {
 		return nil, err
 	}
