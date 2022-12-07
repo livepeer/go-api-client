@@ -259,13 +259,15 @@ type (
 		Status TaskStatus `json:"status"`
 	}
 
-	importAssetRequest struct {
-		Name string `json:"name,omitempty"`
-		URL  string `json:"url"`
+	uploadViaURLRequest struct {
+		Name                     string `json:"name,omitempty"`
+		URL                      string `json:"url"`
+		CatalystPipelineStrategy string `json:"catalystPipelineStrategy,omitempty"`
 	}
 
 	requestUploadRequest struct {
-		Name string `json:"name,omitempty"`
+		Name                     string `json:"name,omitempty"`
+		CatalystPipelineStrategy string `json:"catalystPipelineStrategy,omitempty"`
 	}
 
 	transcodeAssetRequest struct {
@@ -781,11 +783,15 @@ func (lapi *Client) UpdateTaskStatus(id string, phase TaskPhase, progress float6
 	return nil
 }
 
-func (lapi *Client) ImportAsset(url string, name string) (*Asset, *Task, error) {
+func (lapi *Client) UploadViaURL(url, name, catalystStrategy string) (*Asset, *Task, error) {
 	var (
 		requestUrl = fmt.Sprintf("%s/api/asset/import", lapi.chosenServer)
-		input      = &importAssetRequest{URL: url, Name: name}
-		output     TaskAndAsset
+		input      = &uploadViaURLRequest{
+			URL:                      url,
+			Name:                     name,
+			CatalystPipelineStrategy: catalystStrategy,
+		}
+		output TaskAndAsset
 	)
 	err := lapi.doRequest("POST", requestUrl, "import_asset", "", input, &output)
 	if err != nil {
@@ -795,11 +801,14 @@ func (lapi *Client) ImportAsset(url string, name string) (*Asset, *Task, error) 
 	return &output.Asset, &output.Task, nil
 }
 
-func (lapi *Client) RequestUpload(name string) (*UploadUrls, error) {
+func (lapi *Client) RequestUpload(name, catalystStrategy string) (*UploadUrls, error) {
 	var (
 		requestUrl = fmt.Sprintf("%s/api/asset/request-upload", lapi.chosenServer)
-		input      = &requestUploadRequest{Name: name}
-		output     UploadUrls
+		input      = &requestUploadRequest{
+			Name:                     name,
+			CatalystPipelineStrategy: catalystStrategy,
+		}
+		output UploadUrls
 	)
 	err := lapi.doRequest("POST", requestUrl, "request_upload", "", input, &output)
 	if err != nil {
