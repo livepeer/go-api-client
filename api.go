@@ -195,10 +195,11 @@ type (
 		OutputAssetID string `json:"outputAssetId,omitempty"`
 		Type          string `json:"type"`
 		Params        struct {
-			Upload    *UploadTaskParams    `json:"upload"`
-			Import    *UploadTaskParams    `json:"import"`
-			Export    *ExportTaskParams    `json:"export"`
-			Transcode *TranscodeTaskParams `json:"transcode"`
+			Upload        *UploadTaskParams        `json:"upload"`
+			Import        *UploadTaskParams        `json:"import"`
+			Export        *ExportTaskParams        `json:"export"`
+			Transcode     *TranscodeTaskParams     `json:"transcode"`
+			TranscodeFile *TranscodeFileTaskParams `json:"transcode-file"`
 		} `json:"params"`
 		Output *struct {
 			Export *struct {
@@ -253,6 +254,35 @@ type (
 
 	TranscodeTaskParams struct {
 		Profile Profile `json:"profile,omitempty"`
+	}
+
+	TranscodeFileTaskParams struct {
+		Input struct {
+			URL         string `json:"url"`
+			Type        string `json:"type"`
+			Endpoint    string `json:"endpoint"`
+			Credentials struct {
+				AccessKeyId     string `json:"accessKeyId"`
+				SecretAccessKey string `json:"secretAccessKey"`
+			} `json:"credentials"`
+			Bucket string `json:"bucket"`
+			Path   string `json:"path"`
+		} `json:"input"`
+		Storage struct {
+			Bucket      string `json:"bucket"`
+			Type        string `json:"type"`
+			Endpoint    string `json:"endpoint"`
+			Credentials struct {
+				AccessKeyId     string `json:"accessKeyId"`
+				SecretAccessKey string `json:"secretAccessKey"`
+			} `json:"credentials"`
+		} `json:"storage"`
+		Outputs struct {
+			HLS struct {
+				Path string `json:"path"`
+			} `json:"hls"`
+		} `json:"outputs"`
+		CatalystPipelineStrategy string `json:"catalystPipelineStrategy,omitempty"`
 	}
 
 	updateTaskProgressRequest struct {
