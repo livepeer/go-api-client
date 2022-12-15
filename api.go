@@ -258,24 +258,10 @@ type (
 
 	TranscodeFileTaskParams struct {
 		Input struct {
-			URL         string `json:"url"`
-			Type        string `json:"type"`
-			Endpoint    string `json:"endpoint"`
-			Credentials struct {
-				AccessKeyId     string `json:"accessKeyId"`
-				SecretAccessKey string `json:"secretAccessKey"`
-			} `json:"credentials"`
-			Bucket string `json:"bucket"`
-			Path   string `json:"path"`
+			URL string `json:"url"`
 		} `json:"input"`
 		Storage struct {
-			Bucket      string `json:"bucket"`
-			Type        string `json:"type"`
-			Endpoint    string `json:"endpoint"`
-			Credentials struct {
-				AccessKeyId     string `json:"accessKeyId"`
-				SecretAccessKey string `json:"secretAccessKey"`
-			} `json:"credentials"`
+			URL string `json:"url"`
 		} `json:"storage"`
 		Outputs struct {
 			HLS struct {
