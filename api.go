@@ -455,6 +455,41 @@ type (
 		Filters                  map[string]interface{}
 		Order                    map[string]bool
 	}
+
+	TranscodeFileReq struct {
+		Input   TranscodeFileReqInput   `json:"input,omitempty"`
+		Storage TranscodeFileReqStorage `json:"storage,omitempty"`
+		Outputs TranscodeFileReqOutputs `json:"outputs,omitempty"`
+	}
+
+	TranscodeFileReqInput struct {
+		Url         string                       `json:"url,omitempty"`
+		Type        string                       `json:"type,omitempty"`
+		Endpoint    string                       `json:"endpoint,omitempty"`
+		Credentials *TranscodeFileReqCredentials `json:"credentials,omitempty"`
+		Bucket      string                       `json:"bucket,omitempty"`
+		Path        string                       `json:"path,omitempty"`
+	}
+
+	TranscodeFileReqStorage struct {
+		Type        string                       `json:"type,omitempty"`
+		Endpoint    string                       `json:"endpoint,omitempty"`
+		Credentials *TranscodeFileReqCredentials `json:"credentials,omitempty"`
+		Bucket      string                       `json:"bucket,omitempty"`
+	}
+
+	TranscodeFileReqOutputs struct {
+		Hls TranscodeFileReqOutputsHls `json:"hls,omitempty"`
+	}
+
+	TranscodeFileReqOutputsHls struct {
+		Path string `json:"path,omitempty"`
+	}
+
+	TranscodeFileReqCredentials struct {
+		AccessKeyId     string `json:"accessKeyId,omitempty"`
+		SecretAccessKey string `json:"secretAccessKey,omitempty"`
+	}
 )
 
 // NewAPIClientGeolocated creates a new Livepeer API object calling the
@@ -1206,6 +1241,14 @@ func (lapi *Client) pushSegmentOnce(sid string, seqNo int, dur time.Duration, se
 		return nil, err
 	}
 	return segments, nil
+}
+
+// TranscodeFile transcodes a file
+func (lapi *Client) TranscodeFile(tfr TranscodeFileReq) (*Task, error) {
+	u := fmt.Sprintf("%s/api/transcode", lapi.chosenServer)
+	var task *Task
+	err := lapi.doRequest("POST", u, "task", "", tfr, &task)
+	return task, err
 }
 
 // Calls the action function until no error or an unretriable error is returned,
