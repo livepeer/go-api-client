@@ -268,7 +268,8 @@ type (
 				Path string `json:"path"`
 			} `json:"hls"`
 		} `json:"outputs"`
-		CatalystPipelineStrategy string `json:"catalystPipelineStrategy,omitempty"`
+		Profiles                 []Profile `json:"profiles,omitempty"`
+		CatalystPipelineStrategy string    `json:"catalystPipelineStrategy,omitempty"`
 	}
 
 	updateTaskProgressRequest struct {
