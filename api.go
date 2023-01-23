@@ -876,7 +876,7 @@ func (lapi *Client) UploadAsset(ctx context.Context, url string, file io.ReadSee
 		if err != nil {
 			return fmt.Errorf("error seeking to start of file: %w", err)
 		}
-		req, err := http.NewRequestWithContext(ctx, "PUT", url, file)
+		req, err := http.NewRequestWithContext(ctx, "PUT", url, io.NopCloser(file))
 		if err != nil {
 			return err
 		}
