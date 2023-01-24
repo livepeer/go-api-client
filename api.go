@@ -74,6 +74,26 @@ const (
 	TaskPhaseCompleted TaskPhase = "completed"
 )
 
+type PlaybackInfoType string
+
+const (
+	PlaybackInfoTypeLive      PlaybackInfoType = "live"
+	PlaybackInfoTypeVod       PlaybackInfoType = "vod"
+	PlaybackInfoTypeRecording PlaybackInfoType = "recording"
+)
+
+type HRN string
+
+const (
+	HRN_HLS HRN = "HLS (TS)"
+)
+
+type PlaybackInfoSourceType string
+
+const (
+	PlaybackInfoSourceTypeHLS PlaybackInfoSourceType = "html5/application/vnd.apple.mpegurl"
+)
+
 type (
 	// Object with all options given to Livepeer API
 	ClientOptions struct {
@@ -490,6 +510,20 @@ type (
 	TranscodeFileReqCredentials struct {
 		AccessKeyId     string `json:"accessKeyId,omitempty"`
 		SecretAccessKey string `json:"secretAccessKey,omitempty"`
+	}
+
+	PlaybackInfoSource struct {
+		Hrn  HRN                    `json:"hrn"`
+		Type PlaybackInfoSourceType `json:"type"`
+		Url  string                 `json:"url"`
+	}
+
+	PlaybackInfo struct {
+		Type PlaybackInfoType `json:"type"`
+		Meta struct {
+			Live   *int                 `json:"live,omitempty"`
+			Source []PlaybackInfoSource `json:"source"`
+		} `json:"meta"`
 	}
 )
 
@@ -1026,6 +1060,15 @@ func (lapi *Client) GetAssetByPlaybackID(pid string, includeDeleted bool) (*Asse
 func (lapi *Client) DeleteAsset(id string) error {
 	url := fmt.Sprintf("%s/api/asset/%s", lapi.chosenServer, id)
 	return lapi.doRequest("DELETE", url, "asset", "", nil, nil)
+}
+
+func (lapi *Client) GetPlaybackInfo(pid string) (*PlaybackInfo, error) {
+	var pinfo *PlaybackInfo
+	url := fmt.Sprintf("%s/api/playback/%s", lapi.chosenServer, pid)
+	if err := lapi.getJSON(url, "playback_info", "", &pinfo); err != nil {
+		return nil, err
+	}
+	return pinfo, nil
 }
 
 func (lapi *Client) GetObjectStore(id string) (*ObjectStore, error) {
