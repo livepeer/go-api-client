@@ -32,11 +32,20 @@ const (
 	INSANE2  = 14
 )
 
+type HTTPStatusError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e *HTTPStatusError) Error() string {
+	return e.Message
+}
+
 var (
 	// ErrNotExists returned if receives a 404 error from the API
-	ErrNotExists = errors.New("not found")
+	ErrNotExists error = &HTTPStatusError{404, "not exists"}
 	// ErrRateLimited returned if receives a 429 error from the API
-	ErrRateLimited = errors.New("rate limited")
+	ErrRateLimited error = &HTTPStatusError{429, "rate limited"}
 )
 
 var defaultHTTPClient = &http.Client{
@@ -1329,13 +1338,26 @@ func checkResponseError(resp *http.Response) error {
 	} else if resp.StatusCode == http.StatusTooManyRequests {
 		return ErrRateLimited
 	}
+	return newHTTPStatusError(resp.StatusCode, body)
+}
+
+func newHTTPStatusError(status int, body []byte) error {
+	if status == http.StatusNotFound {
+		return ErrNotExists
+	} else if status == http.StatusTooManyRequests {
+		return ErrRateLimited
+	}
+
 	var errResp struct {
 		Errors []string `json:"errors"`
 	}
+	var msg string
 	if err := json.Unmarshal(body, &errResp); err != nil || len(errResp.Errors) == 0 {
-		return fmt.Errorf("request failed with status %s and body: %s", resp.Status, body)
+		msg = fmt.Sprintf("request failed with status %s and body: %s", http.StatusText(status), body)
+	} else {
+		msg = fmt.Sprintf("request failed with status %s and errors: %v", http.StatusText(status), errResp.Errors)
 	}
-	return fmt.Errorf("request failed with status %s and errors: %v", resp.Status, errResp.Errors)
+	return &HTTPStatusError{status, msg}
 }
 
 func isSuccessStatus(status int) bool {
