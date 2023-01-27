@@ -771,9 +771,8 @@ func (lapi *Client) SetActive(id string, active bool, startedAt time.Time) (bool
 	if !startedAt.IsZero() {
 		req.StartedAt = startedAt.UnixNano() / int64(time.Millisecond)
 	}
-	var res json.RawMessage
-	err := lapi.doRequest("PUT", u, "stream", "set_active", req, &res)
-	glog.Infof("Ran setactive request id=%s request=%+v response=%q error=%q", id, req, res, err)
+	err := lapi.doRequest("PUT", u, "stream", "set_active", req, nil)
+	glog.Infof("Ran setactive request id=%s request=%+v error=%q", id, req, err)
 	if err != nil {
 		lapi.metrics.APIRequest("set_active", 0, err)
 		return false, err
