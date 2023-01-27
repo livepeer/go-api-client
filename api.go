@@ -32,11 +32,20 @@ const (
 	INSANE2  = 14
 )
 
+type HTTPStatusError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e *HTTPStatusError) Error() string {
+	return e.Message
+}
+
 var (
 	// ErrNotExists returned if receives a 404 error from the API
-	ErrNotExists = errors.New("not found")
+	ErrNotExists error = &HTTPStatusError{404, "not exists"}
 	// ErrRateLimited returned if receives a 429 error from the API
-	ErrRateLimited = errors.New("rate limited")
+	ErrRateLimited error = &HTTPStatusError{429, "rate limited"}
 )
 
 var defaultHTTPClient = &http.Client{
@@ -759,7 +768,7 @@ func (lapi *Client) GetSessions(id string, forceUrl bool) ([]UserSession, error)
 }
 
 // SetActive set isActive
-func (lapi *Client) SetActive(id string, active bool, startedAt time.Time) (bool, error) {
+func (lapi *Client) SetActive(id string, active bool, startedAt time.Time) (ok bool, err error) {
 	if id == "" {
 		return false, errors.New("empty id")
 	}
@@ -771,13 +780,19 @@ func (lapi *Client) SetActive(id string, active bool, startedAt time.Time) (bool
 	if !startedAt.IsZero() {
 		req.StartedAt = startedAt.UnixNano() / int64(time.Millisecond)
 	}
-	var res json.RawMessage
-	err := lapi.doRequest("PUT", u, "stream", "set_active", req, &res)
-	glog.Infof("Ran setactive request id=%s request=%+v response=%q error=%q", id, req, res, err)
-	if err != nil {
+
+	err = lapi.doRequest("PUT", u, "stream", "set_active", req, nil)
+	glog.Infof("Ran setactive request id=%s request=%+v error=%q", id, req, err)
+
+	var httpErr *HTTPStatusError
+	if err == ErrNotExists || (errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusForbidden) {
+		// return !ok to block the stream from starting if it doesn't exist or is forbidden
+		return false, nil
+	} else if err != nil {
 		lapi.metrics.APIRequest("set_active", 0, err)
 		return false, err
 	}
+
 	return true, nil
 }
 
@@ -1325,18 +1340,26 @@ func checkResponseError(resp *http.Response) error {
 	if err != nil {
 		return fmt.Errorf("failed reading error response (%s): %w", resp.Status, err)
 	}
-	if resp.StatusCode == http.StatusNotFound {
+	return newHTTPStatusError(resp.StatusCode, body)
+}
+
+func newHTTPStatusError(status int, body []byte) error {
+	if status == http.StatusNotFound {
 		return ErrNotExists
-	} else if resp.StatusCode == http.StatusTooManyRequests {
+	} else if status == http.StatusTooManyRequests {
 		return ErrRateLimited
 	}
+
 	var errResp struct {
 		Errors []string `json:"errors"`
 	}
+	var msg string
 	if err := json.Unmarshal(body, &errResp); err != nil || len(errResp.Errors) == 0 {
-		return fmt.Errorf("request failed with status %s and body: %s", resp.Status, body)
+		msg = fmt.Sprintf("request failed with status %s and body: %s", http.StatusText(status), body)
+	} else {
+		msg = fmt.Sprintf("request failed with status %s and errors: %v", http.StatusText(status), errResp.Errors)
 	}
-	return fmt.Errorf("request failed with status %s and errors: %v", resp.Status, errResp.Errors)
+	return &HTTPStatusError{status, msg}
 }
 
 func isSuccessStatus(status int) bool {
