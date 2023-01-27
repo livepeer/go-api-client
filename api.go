@@ -768,7 +768,7 @@ func (lapi *Client) GetSessions(id string, forceUrl bool) ([]UserSession, error)
 }
 
 // SetActive set isActive
-func (lapi *Client) SetActive(id string, active bool, startedAt time.Time) (bool, error) {
+func (lapi *Client) SetActive(id string, active bool, startedAt time.Time) (ok bool, err error) {
 	if id == "" {
 		return false, errors.New("empty id")
 	}
@@ -780,12 +780,19 @@ func (lapi *Client) SetActive(id string, active bool, startedAt time.Time) (bool
 	if !startedAt.IsZero() {
 		req.StartedAt = startedAt.UnixNano() / int64(time.Millisecond)
 	}
-	err := lapi.doRequest("PUT", u, "stream", "set_active", req, nil)
+
+	err = lapi.doRequest("PUT", u, "stream", "set_active", req, nil)
 	glog.Infof("Ran setactive request id=%s request=%+v error=%q", id, req, err)
-	if err != nil {
+
+	var httpErr *HTTPStatusError
+	if err == ErrNotExists || (errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusForbidden) {
+		// return !ok to block the stream from starting if it doesn't exist or is forbidden
+		return false, nil
+	} else if err != nil {
 		lapi.metrics.APIRequest("set_active", 0, err)
 		return false, err
 	}
+
 	return true, nil
 }
 
