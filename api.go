@@ -1340,11 +1340,6 @@ func checkResponseError(resp *http.Response) error {
 	if err != nil {
 		return fmt.Errorf("failed reading error response (%s): %w", resp.Status, err)
 	}
-	if resp.StatusCode == http.StatusNotFound {
-		return ErrNotExists
-	} else if resp.StatusCode == http.StatusTooManyRequests {
-		return ErrRateLimited
-	}
 	return newHTTPStatusError(resp.StatusCode, body)
 }
 
