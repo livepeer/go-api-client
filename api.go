@@ -258,7 +258,11 @@ type (
 	}
 
 	UploadTaskParams struct {
-		URL                      string `json:"url,omitempty"`
+		URL        string `json:"url,omitempty"`
+		Encryption struct {
+			Key       string `json:"key"`
+			Algorithm string `json:"algorithm,omitempty"`
+		} `json:"encryption,omitempty"`
 		RecordedSessionID        string `json:"recordedSessionId,omitempty"`
 		UploadedObjectKey        string `json:"uploadedObjectKey,omitempty"`
 		CatalystPipelineStrategy string `json:"catalystPipelineStrategy,omitempty"`
