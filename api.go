@@ -886,7 +886,7 @@ func (lapi *Client) UpdateTaskStatus(id string, phase TaskPhase, progress float6
 
 func (lapi *Client) UploadViaURL(url, name, catalystStrategy string) (*Asset, *Task, error) {
 	var (
-		requestUrl = fmt.Sprintf("%s/api/asset/import", lapi.chosenServer)
+		requestUrl = fmt.Sprintf("%s/api/asset/upload/url", lapi.chosenServer)
 		input      = &uploadViaURLRequest{
 			URL:                      url,
 			Name:                     name,
