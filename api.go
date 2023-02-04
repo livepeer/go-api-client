@@ -394,7 +394,7 @@ type (
 	}
 
 	AssetFileSpec struct {
-		Size string `json:"size"`
+		Size int `json:"size"`
 	}
 
 	AssetHash struct {
