@@ -388,8 +388,13 @@ type (
 	}
 
 	AssetFile struct {
-		Type string `json:"type"`
-		Path string `json:"path"`
+		Type string        `json:"type"`
+		Path string        `json:"path"`
+		Spec AssetFileSpec `json:"spec,omitempty"`
+	}
+
+	AssetFileSpec struct {
+		Size int `json:"size"`
 	}
 
 	AssetHash struct {
