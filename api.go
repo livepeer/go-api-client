@@ -394,7 +394,10 @@ type (
 	}
 
 	AssetFileSpec struct {
-		Size int `json:"size"`
+		Size    int64 `json:"size,omitempty"`
+		Width   int64 `json:"width,omitempty"`
+		Height  int64 `json:"height,omitempty"`
+		Bitrate int64 `json:"bitrate,omitempty"`
 	}
 
 	AssetHash struct {
