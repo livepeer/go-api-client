@@ -252,6 +252,7 @@ type (
 	TaskStatus struct {
 		Phase        TaskPhase `json:"phase"`
 		Progress     float64   `json:"progress"`
+		Step         string    `json:"step,omitempty"`
 		Retries      int       `json:"retries,omitempty"`
 		UpdatedAt    int64     `json:"updatedAt,omitempty"`
 		ErrorMessage string    `json:"errorMessage,omitempty"`
@@ -882,10 +883,10 @@ func (lapi *Client) GetTask(id string, strongConsistency bool) (*Task, error) {
 	return &task, nil
 }
 
-func (lapi *Client) UpdateTaskStatus(id string, phase TaskPhase, progress float64) error {
+func (lapi *Client) UpdateTaskStatus(id string, phase TaskPhase, progress float64, step string) error {
 	var (
 		url    = fmt.Sprintf("%s/api/task/%s/status", lapi.chosenServer, id)
-		input  = &updateTaskProgressRequest{Status: TaskStatus{phase, progress, 0, 0, ""}}
+		input  = &updateTaskProgressRequest{Status: TaskStatus{phase, progress, step, 0, 0, ""}}
 		output json.RawMessage
 	)
 	err := lapi.doRequest("POST", url, "task", "update_task_progress", input, &output)
