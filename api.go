@@ -216,6 +216,10 @@ type (
 		CreatedAt int64  `json:"createdAt,omitempty"`
 	}
 
+	TranscodeFileTaskOutputPath struct {
+		Path string `json:"path,omitempty"`
+	}
+
 	Task struct {
 		ID            string `json:"id"`
 		UserID        string `json:"userId"`
@@ -241,6 +245,11 @@ type (
 					NftMetadataGatewayUrl string `json:"nftMetadataGatewayUrl"`
 				} `json:"ipfs"`
 			} `json:"export"`
+			TranscodeFile *struct {
+				BaseUrl string                        `json:"baseUrl"`
+				Hls     TranscodeFileTaskOutputPath   `json:"hls"`
+				Mp4     []TranscodeFileTaskOutputPath `json:"mp4"`
+			} `json:"transcodeFile"`
 		} `json:"output"`
 		Status TaskStatus `json:"status"`
 	}
@@ -532,6 +541,7 @@ type (
 	TranscodeFileReqCredentials struct {
 		AccessKeyId     string `json:"accessKeyId,omitempty"`
 		SecretAccessKey string `json:"secretAccessKey,omitempty"`
+		Proof           string `json:"proof,omitempty"`
 	}
 
 	PlaybackInfoSource struct {
