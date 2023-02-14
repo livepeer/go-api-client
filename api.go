@@ -233,6 +233,7 @@ type (
 			Export        *ExportTaskParams        `json:"export"`
 			Transcode     *TranscodeTaskParams     `json:"transcode"`
 			TranscodeFile *TranscodeFileTaskParams `json:"transcode-file"`
+			Delete        *DeleteAssetTaskParams   `json:"delete"`
 		} `json:"params"`
 		Output *struct {
 			Export *struct {
@@ -313,6 +314,11 @@ type (
 		} `json:"outputs"`
 		Profiles                 []Profile `json:"profiles,omitempty"`
 		CatalystPipelineStrategy string    `json:"catalystPipelineStrategy,omitempty"`
+	}
+
+	DeleteAssetTaskParams struct {
+		Id            string `json:"id"`
+		ObjectStoreId string `json:"objectStoreId"`
 	}
 
 	updateTaskProgressRequest struct {
