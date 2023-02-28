@@ -81,6 +81,8 @@ const (
 	TaskPhaseRunning   TaskPhase = "running"
 	TaskPhaseFailed    TaskPhase = "failed"
 	TaskPhaseCompleted TaskPhase = "completed"
+	TaskPhaseDeleting  TaskPhase = "deleting"
+	TaskPhaseDeleted   TaskPhase = "deleted"
 )
 
 type PlaybackInfoType string
