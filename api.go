@@ -313,6 +313,7 @@ type (
 		} `json:"outputs"`
 		Profiles                 []Profile `json:"profiles,omitempty"`
 		CatalystPipelineStrategy string    `json:"catalystPipelineStrategy,omitempty"`
+		TargetSegmentSizeSecs    int64     `json:"target_segment_size_secs,omitempty"`
 	}
 
 	updateTaskProgressRequest struct {
