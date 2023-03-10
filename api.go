@@ -377,7 +377,7 @@ type (
 		ObjectStoreID string      `json:"objectStoreId"`
 		DownloadURL   string      `json:"downloadUrl"`
 		PlaybackURL   string      `json:"playbackUrl"`
-		GenerateMp4s  bool        `json:"generateMp4s,omitempty"`
+		StaticMp4     bool        `json:"staticMp4,omitempty"`
 		Status        AssetStatus `json:"status"`
 		AssetSpec
 	}
