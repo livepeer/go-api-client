@@ -312,7 +312,7 @@ type (
 			} `json:"hls"`
 			MP4 struct {
 				Path string `json:"path"`
-			} `json:"mp4"`
+			} `json:"mp4,omitempty"`
 		} `json:"outputs"`
 		Profiles                 []Profile `json:"profiles,omitempty"`
 		CatalystPipelineStrategy string    `json:"catalystPipelineStrategy,omitempty"`
