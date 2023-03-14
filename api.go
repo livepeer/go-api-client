@@ -310,6 +310,9 @@ type (
 			HLS struct {
 				Path string `json:"path"`
 			} `json:"hls"`
+			MP4 struct {
+				Path string `json:"path"`
+			} `json:"mp4"`
 		} `json:"outputs"`
 		Profiles                 []Profile `json:"profiles,omitempty"`
 		CatalystPipelineStrategy string    `json:"catalystPipelineStrategy,omitempty"`
