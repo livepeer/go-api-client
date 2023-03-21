@@ -453,7 +453,7 @@ type (
 	AssetIPFS struct {
 		IPFSFileInfo
 		NFTMetadata *IPFSFileInfo `json:"nftMetadata,omitempty"`
-		Spec        struct {
+		Spec        *struct {
 			NFTMetadataTemplate `json:"nftMetadataTemplate,omitempty"`
 			NFTMetadata         map[string]interface{} `json:"nftMetadata,omitempty"`
 		} `json:"spec"`
