@@ -310,6 +310,9 @@ type (
 			HLS struct {
 				Path string `json:"path"`
 			} `json:"hls"`
+			MP4 struct {
+				Path string `json:"path"`
+			} `json:"mp4"`
 		} `json:"outputs"`
 		Profiles                 []Profile `json:"profiles,omitempty"`
 		CatalystPipelineStrategy string    `json:"catalystPipelineStrategy,omitempty"`
@@ -533,10 +536,11 @@ type (
 	}
 
 	TranscodeFileReqOutputs struct {
-		Hls TranscodeFileReqOutputsHls `json:"hls,omitempty"`
+		Hls TranscodeFileReqOutput `json:"hls,omitempty"`
+		Mp4 TranscodeFileReqOutput `json:"mp4,omitempty"`
 	}
 
-	TranscodeFileReqOutputsHls struct {
+	TranscodeFileReqOutput struct {
 		Path string `json:"path,omitempty"`
 	}
 
