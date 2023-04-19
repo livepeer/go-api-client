@@ -831,11 +831,14 @@ func (lapi *Client) GetSessions(id string, forceUrl bool) ([]UserSession, error)
 }
 
 // SetActive set isActive
-func (lapi *Client) SetActive(id string, active bool, startedAt time.Time) (ok bool, err error) {
+func (lapi *Client) SetActive(id, recordingID string, active bool, startedAt time.Time) (ok bool, err error) {
 	if id == "" {
 		return false, errors.New("empty id")
 	}
-	u := fmt.Sprintf("%s/api/stream/%s/setactive", lapi.chosenServer, id)
+	if recordingID == "" {
+		return false, errors.New("empty recordingID")
+	}
+	u := fmt.Sprintf("%s/api/stream/%s/%s/setactive", lapi.chosenServer, id, recordingID)
 	req := setActiveReq{
 		Active:   active,
 		HostName: hostName,
