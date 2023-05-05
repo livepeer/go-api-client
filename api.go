@@ -381,8 +381,13 @@ type (
 		DownloadURL   string      `json:"downloadUrl"`
 		PlaybackURL   string      `json:"playbackUrl"`
 		StaticMp4     bool        `json:"staticMp4,omitempty"`
+		Source        AssetSource `json:"source"`
 		Status        AssetStatus `json:"status"`
 		AssetSpec
+	}
+
+	AssetSource struct {
+		Type string `json:"type,omitempty"`
 	}
 
 	AssetStatus struct {
