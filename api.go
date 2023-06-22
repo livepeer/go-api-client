@@ -231,6 +231,7 @@ type (
 			Upload        *UploadTaskParams        `json:"upload"`
 			Import        *UploadTaskParams        `json:"import"`
 			Export        *ExportTaskParams        `json:"export"`
+			ExportData    *ExportDataTaskParams    `json:"export-data"`
 			Transcode     *TranscodeTaskParams     `json:"transcode"`
 			TranscodeFile *TranscodeFileTaskParams `json:"transcode-file"`
 		} `json:"params"`
@@ -278,21 +279,33 @@ type (
 		CatalystPipelineStrategy string `json:"catalystPipelineStrategy,omitempty"`
 	}
 
+	CustomParams struct {
+		URL     string            `json:"url"`
+		Method  string            `json:"method,omitempty"`
+		Headers map[string]string `json:"headers,omitempty"`
+	}
+
+	IPFSParams struct {
+		Pinata *struct {
+			JWT       string `json:"jwt,omitempty"`
+			APIKey    string `json:"apiKey,omitempty"`
+			APISecret string `json:"apiSecret,omitempty"`
+		} `json:"pinata,omitempty"`
+		NFTMetadataTemplate `json:"nftMetadataTemplate,omitempty"`
+		NFTMetadata         map[string]interface{} `json:"nftMetadata,omitempty"`
+	}
+
 	ExportTaskParams struct {
-		Custom *struct {
-			URL     string            `json:"url"`
-			Method  string            `json:"method,omitempty"`
-			Headers map[string]string `json:"headers,omitempty"`
-		} `json:"custom,omitempty"`
-		IPFS *struct {
-			Pinata *struct {
-				JWT       string `json:"jwt,omitempty"`
-				APIKey    string `json:"apiKey,omitempty"`
-				APISecret string `json:"apiSecret,omitempty"`
-			} `json:"pinata,omitempty"`
-			NFTMetadataTemplate `json:"nftMetadataTemplate,omitempty"`
-			NFTMetadata         map[string]interface{} `json:"nftMetadata,omitempty"`
-		} `json:"ipfs,omitempty"`
+		Custom *CustomParams `json:"custom,omitempty"`
+		IPFS   *IPFSParams   `json:"ipfs,omitempty"`
+	}
+
+	ExportDataTaskParams struct {
+		Content string        `json:"content"`
+		Type    string        `json:"type"`
+		ID      string        `json:"id"`
+		Custom  *CustomParams `json:"custom,omitempty"`
+		IPFS    *IPFSParams   `json:"ipfs,omitempty"`
 	}
 
 	TranscodeTaskParams struct {
