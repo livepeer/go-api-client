@@ -231,7 +231,7 @@ type (
 			Upload        *UploadTaskParams        `json:"upload"`
 			Import        *UploadTaskParams        `json:"import"`
 			Export        *ExportTaskParams        `json:"export"`
-			ExportData    *ExportDataTaskParams    `json:"export-data"`
+			ExportData    *ExportDataTaskParams    `json:"exportData"`
 			Transcode     *TranscodeTaskParams     `json:"transcode"`
 			TranscodeFile *TranscodeFileTaskParams `json:"transcode-file"`
 		} `json:"params"`
