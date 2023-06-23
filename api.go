@@ -231,6 +231,7 @@ type (
 			Upload        *UploadTaskParams        `json:"upload"`
 			Import        *UploadTaskParams        `json:"import"`
 			Export        *ExportTaskParams        `json:"export"`
+			ExportData    *ExportDataTaskParams    `json:"exportData"`
 			Transcode     *TranscodeTaskParams     `json:"transcode"`
 			TranscodeFile *TranscodeFileTaskParams `json:"transcode-file"`
 		} `json:"params"`
@@ -279,21 +280,33 @@ type (
 		CatalystPipelineStrategy string `json:"catalystPipelineStrategy,omitempty"`
 	}
 
+	ExportCustomParams struct {
+		URL     string            `json:"url"`
+		Method  string            `json:"method,omitempty"`
+		Headers map[string]string `json:"headers,omitempty"`
+	}
+
+	ExportIPFSParams struct {
+		Pinata *struct {
+			JWT       string `json:"jwt,omitempty"`
+			APIKey    string `json:"apiKey,omitempty"`
+			APISecret string `json:"apiSecret,omitempty"`
+		} `json:"pinata,omitempty"`
+		NFTMetadataTemplate `json:"nftMetadataTemplate,omitempty"`
+		NFTMetadata         map[string]interface{} `json:"nftMetadata,omitempty"`
+	}
+
 	ExportTaskParams struct {
-		Custom *struct {
-			URL     string            `json:"url"`
-			Method  string            `json:"method,omitempty"`
-			Headers map[string]string `json:"headers,omitempty"`
-		} `json:"custom,omitempty"`
-		IPFS *struct {
-			Pinata *struct {
-				JWT       string `json:"jwt,omitempty"`
-				APIKey    string `json:"apiKey,omitempty"`
-				APISecret string `json:"apiSecret,omitempty"`
-			} `json:"pinata,omitempty"`
-			NFTMetadataTemplate `json:"nftMetadataTemplate,omitempty"`
-			NFTMetadata         map[string]interface{} `json:"nftMetadata,omitempty"`
-		} `json:"ipfs,omitempty"`
+		Custom *ExportCustomParams `json:"custom,omitempty"`
+		IPFS   *ExportIPFSParams   `json:"ipfs,omitempty"`
+	}
+
+	ExportDataTaskParams struct {
+		Content json.RawMessage     `json:"content"`
+		Type    string              `json:"type"`
+		ID      string              `json:"id"`
+		Custom  *ExportCustomParams `json:"custom,omitempty"`
+		IPFS    *ExportIPFSParams   `json:"ipfs,omitempty"`
 	}
 
 	TranscodeTaskParams struct {
