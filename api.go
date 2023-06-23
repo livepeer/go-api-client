@@ -302,7 +302,7 @@ type (
 	}
 
 	ExportDataTaskParams struct {
-		Content string              `json:"content"`
+		Content json.RawMessage     `json:"content"`
 		Type    string              `json:"type"`
 		ID      string              `json:"id"`
 		Custom  *ExportCustomParams `json:"custom,omitempty"`
