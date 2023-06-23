@@ -280,13 +280,13 @@ type (
 		CatalystPipelineStrategy string `json:"catalystPipelineStrategy,omitempty"`
 	}
 
-	CustomParams struct {
+	ExportCustomParams struct {
 		URL     string            `json:"url"`
 		Method  string            `json:"method,omitempty"`
 		Headers map[string]string `json:"headers,omitempty"`
 	}
 
-	IPFSParams struct {
+	ExportIPFSParams struct {
 		Pinata *struct {
 			JWT       string `json:"jwt,omitempty"`
 			APIKey    string `json:"apiKey,omitempty"`
@@ -297,16 +297,16 @@ type (
 	}
 
 	ExportTaskParams struct {
-		Custom *CustomParams `json:"custom,omitempty"`
-		IPFS   *IPFSParams   `json:"ipfs,omitempty"`
+		Custom *ExportCustomParams `json:"custom,omitempty"`
+		IPFS   *ExportIPFSParams   `json:"ipfs,omitempty"`
 	}
 
 	ExportDataTaskParams struct {
-		Content string        `json:"content"`
-		Type    string        `json:"type"`
-		ID      string        `json:"id"`
-		Custom  *CustomParams `json:"custom,omitempty"`
-		IPFS    *IPFSParams   `json:"ipfs,omitempty"`
+		Content string              `json:"content"`
+		Type    string              `json:"type"`
+		ID      string              `json:"id"`
+		Custom  *ExportCustomParams `json:"custom,omitempty"`
+		IPFS    *ExportIPFSParams   `json:"ipfs,omitempty"`
 	}
 
 	TranscodeTaskParams struct {
