@@ -327,6 +327,9 @@ type (
 			MP4 struct {
 				Path string `json:"path"`
 			} `json:"mp4"`
+			FMP4 struct {
+				Path string `json:"path"`
+			} `json:"fmp4"`
 		} `json:"outputs"`
 		Profiles                 []Profile `json:"profiles,omitempty"`
 		CatalystPipelineStrategy string    `json:"catalystPipelineStrategy,omitempty"`
@@ -555,8 +558,9 @@ type (
 	}
 
 	TranscodeFileReqOutputs struct {
-		Hls TranscodeFileReqOutput `json:"hls,omitempty"`
-		Mp4 TranscodeFileReqOutput `json:"mp4,omitempty"`
+		Hls  TranscodeFileReqOutput `json:"hls,omitempty"`
+		Mp4  TranscodeFileReqOutput `json:"mp4,omitempty"`
+		FMp4 TranscodeFileReqOutput `json:"fmp4,omitempty"`
 	}
 
 	TranscodeFileReqOutput struct {
