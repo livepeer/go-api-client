@@ -280,10 +280,10 @@ type (
 		UploadedObjectKey        string `json:"uploadedObjectKey,omitempty"`
 		CatalystPipelineStrategy string `json:"catalystPipelineStrategy,omitempty"`
 		ClipStrategy             struct {
-			Enabled    bool   `json:"enabled,omitempty"`
-			StartTime  int64  `json:"startTime,omitempty"`
-			EndTime    int64  `json:"endTime,omitempty"`
-			PlaybackId string `json:"playbackId,omitempty"`
+			Enabled    bool    `json:"enabled,omitempty"`
+			StartTime  float64 `json:"startTime,omitempty"`
+			EndTime    float64 `json:"endTime,omitempty"`
+			PlaybackId string  `json:"playbackId,omitempty"`
 		}
 	}
 
@@ -348,10 +348,10 @@ type (
 			URL string `json:"url"`
 		} `json:"storage"`
 		ClipStrategy struct {
-			Enabled    bool   `json:"enabled"`
-			StartTime  int64  `json:"startTime"`
-			EndTime    int64  `json:"endTime"`
-			PlaybackId string `json:"playbackId"`
+			Enabled    bool    `json:"enabled"`
+			StartTime  float64 `json:"startTime"`
+			EndTime    float64 `json:"endTime"`
+			PlaybackId string  `json:"playbackId"`
 		}
 		Profiles []Profile `json:"profiles,omitempty"`
 	}
