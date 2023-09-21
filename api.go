@@ -336,6 +336,19 @@ type (
 		TargetSegmentSizeSecs    int64     `json:"targetSegmentSizeSecs,omitempty"`
 	}
 
+	ClipTaskParams struct {
+		Storage struct {
+			URL string `json:"url"`
+		} `json:"storage"`
+		ClipStrategy struct {
+			Enabled    bool   `json:"enabled"`
+			StartTime  int64  `json:"startTime"`
+			EndTime    int64  `json:"endTime"`
+			PlaybackId string `json:"playbackId"`
+		}
+		Profiles []Profile `json:"profiles,omitempty"`
+	}
+
 	updateTaskProgressRequest struct {
 		Status TaskStatus `json:"status"`
 	}
