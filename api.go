@@ -344,16 +344,31 @@ type (
 	}
 
 	ClipTaskParams struct {
+		Input struct {
+			URL string `json:"url"`
+		} `json:"input"`
 		Storage struct {
 			URL string `json:"url"`
 		} `json:"storage"`
-		ClipStrategy struct {
+		Outputs struct {
+			HLS struct {
+				Path string `json:"path"`
+			} `json:"hls"`
+			MP4 struct {
+				Path string `json:"path"`
+			} `json:"mp4"`
+			FMP4 struct {
+				Path string `json:"path"`
+			} `json:"fmp4"`
+		} `json:"outputs"`
+		Profiles                 []Profile `json:"profiles,omitempty"`
+		CatalystPipelineStrategy string    `json:"catalystPipelineStrategy,omitempty"`
+		ClipStrategy             struct {
 			Enabled    bool    `json:"enabled"`
 			StartTime  float64 `json:"startTime"`
 			EndTime    float64 `json:"endTime"`
 			PlaybackId string  `json:"playbackId"`
 		}
-		Profiles []Profile `json:"profiles,omitempty"`
 	}
 
 	updateTaskProgressRequest struct {
