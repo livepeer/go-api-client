@@ -279,6 +279,12 @@ type (
 		RecordedSessionID        string `json:"recordedSessionId,omitempty"`
 		UploadedObjectKey        string `json:"uploadedObjectKey,omitempty"`
 		CatalystPipelineStrategy string `json:"catalystPipelineStrategy,omitempty"`
+		ClipStrategy             struct {
+			Enabled    bool   `json:"enabled,omitempty"`
+			StartTime  int64  `json:"startTime,omitempty"`
+			EndTime    int64  `json:"endTime,omitempty"`
+			PlaybackId string `json:"playbackId,omitempty"`
+		}
 	}
 
 	ExportCustomParams struct {
