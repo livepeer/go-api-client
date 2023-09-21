@@ -234,6 +234,7 @@ type (
 			ExportData    *ExportDataTaskParams    `json:"exportData"`
 			Transcode     *TranscodeTaskParams     `json:"transcode"`
 			TranscodeFile *TranscodeFileTaskParams `json:"transcode-file"`
+			Clip          *ClipTaskParams          `json:"clip"`
 		} `json:"params"`
 		Output *struct {
 			Export *struct {
