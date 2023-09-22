@@ -345,6 +345,8 @@ type (
 			EndTime    float64 `json:"endTime"`
 			PlaybackId string  `json:"playbackId"`
 		}
+		InputSessionID string `json:"sessionId"`
+		InputID        string `json:"inputId"`
 	}
 
 	updateTaskProgressRequest struct {
