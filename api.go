@@ -345,8 +345,9 @@ type (
 			EndTime    int64  `json:"endTime"`
 			PlaybackId string `json:"playbackId"`
 		}
-		InputSessionID string `json:"sessionId"`
-		InputID        string `json:"inputId"`
+		InputSessionID      string `json:"sessionId"`
+		InputID             string `json:"inputId"`
+		SourceObjectStoreID string `json:"sourceObjectStoreId"`
 	}
 
 	updateTaskProgressRequest struct {
