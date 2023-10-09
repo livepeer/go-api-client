@@ -234,6 +234,7 @@ type (
 			ExportData    *ExportDataTaskParams    `json:"exportData"`
 			Transcode     *TranscodeTaskParams     `json:"transcode"`
 			TranscodeFile *TranscodeFileTaskParams `json:"transcode-file"`
+			Clip          *ClipTaskParams          `json:"clip"`
 		} `json:"params"`
 		Output *struct {
 			Export *struct {
@@ -334,6 +335,19 @@ type (
 		Profiles                 []Profile `json:"profiles,omitempty"`
 		CatalystPipelineStrategy string    `json:"catalystPipelineStrategy,omitempty"`
 		TargetSegmentSizeSecs    int64     `json:"targetSegmentSizeSecs,omitempty"`
+	}
+
+	ClipTaskParams struct {
+		URL                      string `json:"url"`
+		CatalystPipelineStrategy string `json:"catalystPipelineStrategy,omitempty"`
+		ClipStrategy             struct {
+			StartTime  int64  `json:"startTime"`
+			EndTime    int64  `json:"endTime"`
+			PlaybackId string `json:"playbackId"`
+		}
+		InputSessionID      string `json:"sessionId"`
+		InputID             string `json:"inputId"`
+		SourceObjectStoreID string `json:"sourceObjectStoreId"`
 	}
 
 	updateTaskProgressRequest struct {
