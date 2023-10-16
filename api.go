@@ -189,6 +189,7 @@ type (
 		SourceSegmentsDuration     float64   `json:"sourceSegmentsDuration,omitempty"`
 		TranscodedSegmentsDuration float64   `json:"transcodedSegmentsDuration,omitempty"`
 		Deleted                    bool      `json:"deleted,omitempty"`
+		Suspended                  bool      `json:"suspended,omitempty"`
 		Record                     bool      `json:"record"`
 		Profiles                   []Profile `json:"profiles,omitempty"`
 		Multistream                struct {
