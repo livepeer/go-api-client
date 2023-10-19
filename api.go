@@ -280,6 +280,7 @@ type (
 		RecordedSessionID        string `json:"recordedSessionId,omitempty"`
 		UploadedObjectKey        string `json:"uploadedObjectKey,omitempty"`
 		CatalystPipelineStrategy string `json:"catalystPipelineStrategy,omitempty"`
+		Thumbnails               bool   `json:"thumbnails"`
 	}
 
 	ExportCustomParams struct {
