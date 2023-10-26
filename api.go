@@ -281,6 +281,7 @@ type (
 		UploadedObjectKey        string `json:"uploadedObjectKey,omitempty"`
 		CatalystPipelineStrategy string `json:"catalystPipelineStrategy,omitempty"`
 		Thumbnails               bool   `json:"thumbnails"`
+		C2PA                     bool   `json:"c2pa,omitempty"`
 	}
 
 	ExportCustomParams struct {
@@ -337,6 +338,7 @@ type (
 		Profiles                 []Profile `json:"profiles,omitempty"`
 		CatalystPipelineStrategy string    `json:"catalystPipelineStrategy,omitempty"`
 		TargetSegmentSizeSecs    int64     `json:"targetSegmentSizeSecs,omitempty"`
+		C2PA                     bool      `json:"c2pa,omitempty"`
 	}
 
 	ClipTaskParams struct {
