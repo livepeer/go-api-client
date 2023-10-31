@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     name: Test the livepeer-box project
-    runs-on: ubuntu-22.04
+    runs-on: [self-hosted, linux, amd64]
     steps:
       - name: Check out code
         uses: actions/checkout@v3
