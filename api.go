@@ -871,6 +871,17 @@ func (lapi *Client) GetSessions(id string, forceUrl bool) ([]UserSession, error)
 	return sessions, nil
 }
 
+// Heartbeat updates the stream session
+func (lapi *Client) Heartbeat(id string) error {
+	if id == "" {
+		return errors.New("empty id")
+	}
+	u := fmt.Sprintf("%s/api/stream/%s/heartbeat", lapi.chosenServer, id)
+	err := lapi.doRequest("POST", u, "stream", "heartbeat", nil, nil)
+	glog.Infof("Ran heartbeat request id=%s error=%q", id, err)
+	return err
+}
+
 // SetActive set isActive
 func (lapi *Client) SetActive(id string, active bool, startedAt time.Time) (ok bool, err error) {
 	if id == "" {
