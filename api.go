@@ -419,6 +419,7 @@ type (
 		Source        AssetSource `json:"source"`
 		Status        AssetStatus `json:"status"`
 		AssetSpec
+		SourcePlaybackReady bool `json:"sourcePlaybackReady"`
 	}
 
 	AssetSource struct {
