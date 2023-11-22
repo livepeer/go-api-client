@@ -135,22 +135,26 @@ type (
 	}
 
 	CreateStreamReq struct {
-		Name     string   `json:"name,omitempty"`
-		ParentID string   `json:"parentId,omitempty"`
-		Presets  []string `json:"presets,omitempty"`
-		// one of
-		// - P720p60fps16x9
-		// - P720p30fps16x9
-		// - P720p30fps4x3
-		// - P576p30fps16x9
-		// - P360p30fps16x9
-		// - P360p30fps4x3
-		// - P240p30fps16x9
-		// - P240p30fps4x3
-		// - P144p30fps16x9
-		Profiles            []Profile `json:"profiles,omitempty"`
-		Record              bool      `json:"record,omitempty"`
-		RecordObjectStoreId string    `json:"recordObjectStoreId,omitempty"`
+		Name      string `json:"name"`
+		ParentID  string `json:"parentId,omitempty"`
+		CreatorID string `json:"creatorId,omitempty"`
+
+		// one of: P720p60fps16x9, P720p30fps16x9, P720p30fps4x3, P576p30fps16x9, P360p30fps16x9, P360p30fps4x3, P240p30fps16x9, P240p30fps4x3, P144p30fps16x9
+		// this is deprecated and Profiles should be used instead.
+		Presets        []string        `json:"presets,omitempty"`
+		Profiles       []Profile       `json:"profiles,omitempty"`
+		Record         bool            `json:"record,omitempty"`
+		PlaybackPolicy *PlaybackPolicy `json:"playbackPolicy,omitempty"`
+
+		RecordObjectStoreId string `json:"recordObjectStoreId,omitempty"`
+		ObjectStoreId       string `json:"objectStoreId,omitempty"`
+	}
+
+	PlaybackPolicy struct {
+		// one of: public, jwt, webhook
+		Type           string                 `json:"type"`
+		WebhookID      string                 `json:"webhookId,omitempty"`
+		WebhookContext map[string]interface{} `json:"webhookContext,omitempty"`
 	}
 
 	// Profile transcoding profile
