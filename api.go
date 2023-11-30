@@ -188,6 +188,7 @@ type (
 		ParentID                   string    `json:"parentId,omitempty"`
 		CreatedAt                  int64     `json:"createdAt,omitempty"`
 		LastSeen                   int64     `json:"lastSeen,omitempty"`
+		IsActive                   bool      `json:"isActive,omitempty"`
 		SourceSegments             int64     `json:"sourceSegments,omitempty"`
 		TranscodedSegments         int64     `json:"transcodedSegments,omitempty"`
 		SourceSegmentsDuration     float64   `json:"sourceSegmentsDuration,omitempty"`
