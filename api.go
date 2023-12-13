@@ -163,6 +163,7 @@ type (
 		Width   int    `json:"width,omitempty"`
 		Height  int    `json:"height,omitempty"`
 		Bitrate int    `json:"bitrate,omitempty"`
+		Quality int    `json:"quality,omitempty"`
 		Fps     int    `json:"fps"`
 		FpsDen  int    `json:"fpsDen,omitempty"`
 		Gop     string `json:"gop,omitempty"`
