@@ -207,6 +207,17 @@ type (
 		RecordingStatus string `json:"recordingStatus,omitempty"` // ready, waiting
 		RecordingURL    string `json:"recordingUrl,omitempty"`
 		Mp4Url          string `json:"mp4Url,omitempty"`
+
+		Pull *StreamPull `json:"pull,omitempty"`
+	}
+
+	StreamPull struct {
+		Source   string            `json:"source,omitempty"`
+		Headers  map[string]string `json:"headers,omitempty"`
+		Location struct {
+			Lat float64 `json:"lat,omitempty"`
+			Lon float64 `json:"lon,omitempty"`
+		} `json:"location"`
 	}
 
 	// UserSession user's sessions
