@@ -212,12 +212,12 @@ type (
 	}
 
 	StreamPull struct {
-		Source   string            `json:"source,omitempty"`
+		Source   string            `json:"source"`
 		Headers  map[string]string `json:"headers,omitempty"`
-		Location struct {
-			Lat float64 `json:"lat,omitempty"`
-			Lon float64 `json:"lon,omitempty"`
-		} `json:"location"`
+		Location *struct {
+			Lat float64 `json:"lat"`
+			Lon float64 `json:"lon"`
+		} `json:"location,omitempty"`
 	}
 
 	// UserSession user's sessions
