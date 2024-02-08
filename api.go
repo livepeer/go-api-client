@@ -294,11 +294,12 @@ type (
 			Key          string `json:"key,omitempty"`
 			Algorithm    string `json:"algorithm,omitempty"`
 		} `json:"encryption,omitempty"`
-		RecordedSessionID        string `json:"recordedSessionId,omitempty"`
-		UploadedObjectKey        string `json:"uploadedObjectKey,omitempty"`
-		CatalystPipelineStrategy string `json:"catalystPipelineStrategy,omitempty"`
-		Thumbnails               bool   `json:"thumbnails"`
-		C2PA                     bool   `json:"c2pa,omitempty"`
+		RecordedSessionID        string    `json:"recordedSessionId,omitempty"`
+		UploadedObjectKey        string    `json:"uploadedObjectKey,omitempty"`
+		CatalystPipelineStrategy string    `json:"catalystPipelineStrategy,omitempty"`
+		Thumbnails               bool      `json:"thumbnails"`
+		C2PA                     bool      `json:"c2pa,omitempty"`
+		Profiles                 []Profile `json:"profiles,omitempty"`
 	}
 
 	ExportCustomParams struct {
