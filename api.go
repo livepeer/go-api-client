@@ -300,6 +300,7 @@ type (
 		Thumbnails               bool      `json:"thumbnails"`
 		C2PA                     bool      `json:"c2pa,omitempty"`
 		Profiles                 []Profile `json:"profiles,omitempty"`
+		TargetSegmentSizeSecs    int64     `json:"targetSegmentSizeSecs,omitempty"`
 	}
 
 	ExportCustomParams struct {
