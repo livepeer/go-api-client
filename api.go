@@ -208,7 +208,8 @@ type (
 		RecordingURL    string `json:"recordingUrl,omitempty"`
 		Mp4Url          string `json:"mp4Url,omitempty"`
 
-		Pull *StreamPull `json:"pull,omitempty"`
+		Pull      *StreamPull `json:"pull,omitempty"`
+		CreatorID *CreatorID  `json:"creatorID,omitempty"`
 	}
 
 	StreamPull struct {
@@ -424,6 +425,11 @@ type (
 		Task Task `json:"task"`
 	}
 
+	CreatorID struct {
+		Type  string `json:"type,omitempty"`
+		Value string `json:"value,omitempty"`
+	}
+
 	Asset struct {
 		ID            string      `json:"id"`
 		Deleted       bool        `json:"deleted,omitempty"`
@@ -438,7 +444,8 @@ type (
 		Source        AssetSource `json:"source"`
 		Status        AssetStatus `json:"status"`
 		AssetSpec
-		SourcePlaybackReady bool `json:"sourcePlaybackReady"`
+		SourcePlaybackReady bool       `json:"sourcePlaybackReady"`
+		CreatorID           *CreatorID `json:"creatorId,omitempty"`
 	}
 
 	AssetSource struct {
