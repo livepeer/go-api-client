@@ -209,7 +209,7 @@ type (
 		Mp4Url          string `json:"mp4Url,omitempty"`
 
 		Pull      *StreamPull `json:"pull,omitempty"`
-		CreatorID CreatorID   `json:"creatorID,omitempty"`
+		CreatorID *CreatorID  `json:"creatorID,omitempty"`
 	}
 
 	StreamPull struct {
@@ -444,8 +444,8 @@ type (
 		Source        AssetSource `json:"source"`
 		Status        AssetStatus `json:"status"`
 		AssetSpec
-		SourcePlaybackReady bool      `json:"sourcePlaybackReady"`
-		CreatorID           CreatorID `json:"creatorId,omitempty"`
+		SourcePlaybackReady bool       `json:"sourcePlaybackReady"`
+		CreatorID           *CreatorID `json:"creatorId,omitempty"`
 	}
 
 	AssetSource struct {
