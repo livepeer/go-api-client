@@ -909,6 +909,23 @@ func (lapi *Client) Heartbeat(id string) error {
 	return err
 }
 
+// LockPull locks the stream pull
+func (lapi *Client) LockPull(id string, leaseTimeoutMs time.Duration) error {
+	if id == "" {
+		return errors.New("empty id")
+	}
+
+	payload := struct {
+		leaseTimeout time.Duration
+	}{
+		leaseTimeout: leaseTimeoutMs,
+	}
+	u := fmt.Sprintf("%s/api/stream/%s/lockPull", lapi.chosenServer, id)
+	err := lapi.doRequest("POST", u, "stream", "lock_pull", payload, nil)
+	glog.Infof("Ran lockPull request id=%s error=%q", id, err)
+	return err
+}
+
 // SetActive set isActive
 func (lapi *Client) SetActive(id string, active bool, startedAt time.Time) (ok bool, err error) {
 	if id == "" {
