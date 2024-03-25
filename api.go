@@ -915,10 +915,8 @@ func (lapi *Client) LockPull(id string, leaseTimeoutMs time.Duration) error {
 		return errors.New("empty id")
 	}
 
-	payload := struct {
-		leaseTimeout time.Duration
-	}{
-		leaseTimeout: leaseTimeoutMs,
+	payload := map[string]interface{}{
+		"leaseTimeout": leaseTimeoutMs,
 	}
 	u := fmt.Sprintf("%s/api/stream/%s/lockPull", lapi.chosenServer, id)
 	err := lapi.doRequest("POST", u, "stream", "lock_pull", payload, nil)
