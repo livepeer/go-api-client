@@ -910,13 +910,14 @@ func (lapi *Client) Heartbeat(id string) error {
 }
 
 // LockPull locks the stream pull
-func (lapi *Client) LockPull(id string, leaseTimeoutMs time.Duration) error {
+func (lapi *Client) LockPull(id string, leaseTimeoutMs time.Duration, host string) error {
 	if id == "" {
 		return errors.New("empty id")
 	}
 
 	payload := map[string]interface{}{
 		"leaseTimeout": leaseTimeoutMs,
+		"host":         host,
 	}
 	u := fmt.Sprintf("%s/api/stream/%s/lockPull", lapi.chosenServer, id)
 	err := lapi.doRequest("POST", u, "stream", "lock_pull", payload, nil)
