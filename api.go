@@ -188,6 +188,7 @@ type (
 		PlaybackID                 string    `json:"playbackId,omitempty"`
 		ParentID                   string    `json:"parentId,omitempty"`
 		CreatedAt                  int64     `json:"createdAt,omitempty"`
+		CreatedRegion              string    `json:"createdRegion,omitempty"`
 		LastSeen                   int64     `json:"lastSeen,omitempty"`
 		IsActive                   bool      `json:"isActive,omitempty"`
 		SourceSegments             int64     `json:"sourceSegments,omitempty"`
