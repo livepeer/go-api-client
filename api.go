@@ -188,7 +188,6 @@ type (
 		PlaybackID                 string    `json:"playbackId,omitempty"`
 		ParentID                   string    `json:"parentId,omitempty"`
 		CreatedAt                  int64     `json:"createdAt,omitempty"`
-		CreatedRegion              string    `json:"createdRegion,omitempty"`
 		LastSeen                   int64     `json:"lastSeen,omitempty"`
 		IsActive                   bool      `json:"isActive,omitempty"`
 		SourceSegments             int64     `json:"sourceSegments,omitempty"`
@@ -209,8 +208,9 @@ type (
 		RecordingURL    string `json:"recordingUrl,omitempty"`
 		Mp4Url          string `json:"mp4Url,omitempty"`
 
-		Pull      *StreamPull `json:"pull,omitempty"`
-		CreatorID *CreatorID  `json:"creatorID,omitempty"`
+		Pull       *StreamPull `json:"pull,omitempty"`
+		PullRegion string      `json:"pullRegion,omitempty"`
+		CreatorID  *CreatorID  `json:"creatorID,omitempty"`
 	}
 
 	StreamPull struct {
