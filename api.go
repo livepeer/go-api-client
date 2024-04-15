@@ -208,8 +208,9 @@ type (
 		RecordingURL    string `json:"recordingUrl,omitempty"`
 		Mp4Url          string `json:"mp4Url,omitempty"`
 
-		Pull      *StreamPull `json:"pull,omitempty"`
-		CreatorID *CreatorID  `json:"creatorID,omitempty"`
+		Pull       *StreamPull `json:"pull,omitempty"`
+		PullRegion string      `json:"pullRegion,omitempty"`
+		CreatorID  *CreatorID  `json:"creatorID,omitempty"`
 	}
 
 	StreamPull struct {
