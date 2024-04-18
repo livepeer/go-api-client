@@ -574,11 +574,11 @@ type (
 	}
 
 	ListOptions struct {
-		Limit                    int
-		Cursor                   string
-		AllUsers, IncludeDeleted bool
-		Filters                  map[string]interface{}
-		Order                    map[string]bool
+		Limit                                     int
+		Cursor                                    string
+		AllUsers, IncludeDeleted, IncludeDeleting bool
+		Filters                                   map[string]interface{}
+		Order                                     map[string]bool
 	}
 
 	TranscodeFileReq struct {
@@ -1141,11 +1141,29 @@ func (lapi *Client) GetAsset(id string, strongConsistency bool) (*Asset, error) 
 	return &asset, nil
 }
 
+func (lapi *Client) GetDeletingAssets() ([]*Asset, error) {
+	assets, _, err := lapi.ListAssets(ListOptions{
+		Limit:           100,
+		AllUsers:        true,
+		IncludeDeleted:  true,
+		IncludeDeleting: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return assets, nil
+}
+
+func (lapi *Client) FlagAssetAsDeleted(assetID string) error {
+	url := fmt.Sprintf("%s/api/asset/%s/deleted", lapi.chosenServer, assetID)
+	return lapi.doRequest("PATCH", url, "asset", "asset-deleted", nil, nil)
+}
+
 func (lapi *Client) ListAssets(opts ListOptions) ([]*Asset, string, error) {
 	if opts.Limit <= 0 {
 		opts.Limit = 10
 	}
-	url := fmt.Sprintf("%s/api/asset?limit=%d&cursor=%s&allUsers=%v&all=%v", lapi.chosenServer, opts.Limit, opts.Cursor, opts.AllUsers, opts.IncludeDeleted)
+	url := fmt.Sprintf("%s/api/asset?limit=%d&cursor=%s&allUsers=%v&all=%v&deleting=%v", lapi.chosenServer, opts.Limit, opts.Cursor, opts.AllUsers, opts.IncludeDeleted, opts.IncludeDeleting)
 	if len(opts.Filters) > 0 {
 		filtersStrs := make([]string, 0, len(opts.Filters))
 		for k, v := range opts.Filters {
