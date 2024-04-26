@@ -216,6 +216,7 @@ type (
 	StreamPull struct {
 		Source   string            `json:"source"`
 		Headers  map[string]string `json:"headers,omitempty"`
+		IsMobile bool              `json:"isMobile,omitempty"`
 		Location *struct {
 			Lat float64 `json:"lat"`
 			Lon float64 `json:"lon"`
