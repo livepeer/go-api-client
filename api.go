@@ -466,7 +466,7 @@ type (
 		Hash                []AssetHash     `json:"hash"`
 		Files               []AssetFile     `json:"files"`
 		VideoSpec           *AssetVideoSpec `json:"videoSpec,omitempty"`
-		Storage             AssetStorage    `json:"storage"`
+		Storage             *AssetStorage   `json:"storage,omitempty"`
 		PlaybackRecordingID string          `json:"playbackRecordingId,omitempty"`
 	}
 
