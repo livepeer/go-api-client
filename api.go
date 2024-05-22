@@ -1202,7 +1202,8 @@ func (lapi *Client) GetAssetByPlaybackID(pid string, includeDeleted bool) (*Asse
 		AllUsers:       true,
 		IncludeDeleted: includeDeleted,
 		Filters: map[string]interface{}{
-			"playbackId": pid,
+			"id":    "playbackId",
+			"value": pid,
 		}})
 	if err != nil {
 		return nil, err
