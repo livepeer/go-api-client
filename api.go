@@ -211,7 +211,7 @@ type (
 		Pull       *StreamPull `json:"pull,omitempty"`
 		PullRegion string      `json:"pullRegion,omitempty"`
 		CreatorID  *CreatorID  `json:"creatorID,omitempty"`
-		ProjectID  string      `json:"projectID,omitempty"`
+		ProjectID  string      `json:"projectId,omitempty"`
 	}
 
 	StreamPull struct {
