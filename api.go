@@ -143,11 +143,13 @@ type (
 		// this is deprecated and Profiles should be used instead.
 		Presets        []string        `json:"presets,omitempty"`
 		Profiles       []Profile       `json:"profiles,omitempty"`
-		Record         bool            `json:"record,omitempty"`
 		PlaybackPolicy *PlaybackPolicy `json:"playbackPolicy,omitempty"`
 
-		RecordObjectStoreId string `json:"recordObjectStoreId,omitempty"`
-		ObjectStoreId       string `json:"objectStoreId,omitempty"`
+		Record              bool           `json:"record,omitempty"`
+		RecordObjectStoreId string         `json:"recordObjectStoreId,omitempty"`
+		RecordingSpec       *RecordingSpec `json:"recordingSpec,omitempty"`
+
+		ObjectStoreId string `json:"objectStoreId,omitempty"`
 	}
 
 	PlaybackPolicy struct {
@@ -201,6 +203,7 @@ type (
 		Multistream                struct {
 			Targets []MultistreamTargetRef `json:"targets,omitempty"`
 		} `json:"multistream"`
+		RecordingSpec *RecordingSpec `json:"recordingSpec,omitempty"`
 
 		// These can be present on parent stream objects if they are used to stream
 		// directly to broadcasters (i.e. not using the streamKey through RTMP)
@@ -212,6 +215,10 @@ type (
 		PullRegion string      `json:"pullRegion,omitempty"`
 		CreatorID  *CreatorID  `json:"creatorID,omitempty"`
 		ProjectID  string      `json:"projectId,omitempty"`
+	}
+
+	RecordingSpec struct {
+		Profiles *[]Profile `json:"profiles,omitempty"`
 	}
 
 	StreamPull struct {
