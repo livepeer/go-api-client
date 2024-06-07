@@ -374,8 +374,9 @@ type (
 		URL                      string `json:"url"`
 		CatalystPipelineStrategy string `json:"catalystPipelineStrategy,omitempty"`
 		ClipStrategy             struct {
-			StartTime  int64  `json:"startTime"`
+			StartTime  int64  `json:"startTime,omitempty"`
 			EndTime    int64  `json:"endTime"`
+			Offset     int64  `json:"offset,omitempty"`
 			PlaybackId string `json:"playbackId"`
 		}
 		InputSessionID      string `json:"sessionId"`
