@@ -173,6 +173,15 @@ type (
 		Encoder string `json:"encoder,omitempty"` // enum: - h264, h265, vp8, vp9
 	}
 
+	Clip struct {
+		Name       string `json:"name,omitempty"`
+		StartTime  int64  `json:"startTime,omitempty"`
+		EndTime    int64  `json:"endTime,omitempty"`
+		PlaybackID string `json:"playbackId,omitempty"`
+		SessionID  string `json:"sessionId,omitempty"`
+		Offset     int64  `json:"offset,omitempty"`
+	}
+
 	MultistreamTargetRef struct {
 		Profile   string `json:"profile,omitempty"`
 		VideoOnly bool   `json:"videoOnly,omitempty"`
@@ -1127,6 +1136,21 @@ func (lapi *Client) ExportAsset(assetId string) (*Task, error) {
 	}
 	glog.V(logs.DEBUG).Infof("Created export task id=%s status=%s type=%s", output.Task.ID, output.Task.Status.Phase, output.Task.Type)
 	return &output.Task, nil
+}
+
+func (lapi *Client) Clip(params Clip) (*Asset, *Task, error) {
+	var (
+		url    = fmt.Sprintf("%s/api/clip", lapi.chosenServer)
+		input  = &params
+		output TaskAndAsset
+	)
+
+	err := lapi.doRequest("POST", url, "clip", "", input, &output)
+	if err != nil {
+		return nil, nil, err
+	}
+	glog.V(logs.DEBUG).Infof("Created clip task id=%s assetId=%s status=%s type=%s", output.Task.ID, output.Asset.ID, output.Task.Status.Phase, output.Task.Type)
+	return &output.Asset, &output.Task, nil
 }
 
 func (lapi *Client) GetMultistreamTarget(id string) (*MultistreamTarget, error) {
