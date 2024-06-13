@@ -263,6 +263,7 @@ type (
 			Transcode     *TranscodeTaskParams     `json:"transcode"`
 			TranscodeFile *TranscodeFileTaskParams `json:"transcode-file"`
 			Clip          *ClipTaskParams          `json:"clip"`
+			Delete        *DeleteTaskParams        `json:"delete"`
 		} `json:"params"`
 		Output *struct {
 			Export *struct {
@@ -381,6 +382,10 @@ type (
 		InputSessionID      string `json:"sessionId"`
 		InputID             string `json:"inputId"`
 		SourceObjectStoreID string `json:"sourceObjectStoreId"`
+	}
+
+	DeleteTaskParams struct {
+		AssetID string `json:"assetId"`
 	}
 
 	updateTaskProgressRequest struct {
