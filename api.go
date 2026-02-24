@@ -368,6 +368,7 @@ type (
 		CatalystPipelineStrategy string    `json:"catalystPipelineStrategy,omitempty"`
 		TargetSegmentSizeSecs    int64     `json:"targetSegmentSizeSecs,omitempty"`
 		C2PA                     bool      `json:"c2pa,omitempty"`
+		Reencode                 bool      `json:"reencode,omitempty"`
 	}
 
 	ClipTaskParams struct {
